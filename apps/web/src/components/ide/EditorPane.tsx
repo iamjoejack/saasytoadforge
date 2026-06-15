@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useEffect, useRef, useState } from 'react'
 import { useIde, type CodeEditor } from '@/lib/store'
 import { languageFor } from '@/lib/language'
+import { Toad } from '@/components/Toad'
 import { cn } from '@/lib/cn'
 
 const Monaco = dynamic(() => import('@monaco-editor/react'), {
@@ -194,7 +195,7 @@ export function EditorPane() {
                 : 'text-zinc-500 hover:text-zinc-350'
             )}
           >
-            <span>💻</span> Code
+            Code
           </button>
           <button
             type="button"
@@ -206,7 +207,7 @@ export function EditorPane() {
                 : 'text-zinc-500 hover:text-zinc-350'
             )}
           >
-            <span>🌐</span> Live Preview
+            Live preview
           </button>
         </div>
       </div>
@@ -267,7 +268,7 @@ export function EditorPane() {
                   className="rounded p-1 text-zinc-400 hover:text-[var(--brass)] hover:bg-white/5 transition cursor-pointer"
                   title="Reload"
                 >
-                  🔄
+                  ↻
                 </button>
               </div>
 
@@ -292,9 +293,9 @@ export function EditorPane() {
                       ? 'bg-[var(--brass)]/20 text-[var(--brass)] border-[var(--brass)]/50 animate-pulse'
                       : 'text-zinc-400 border-white/10 hover:text-zinc-200'
                   )}
-                  title="Inspect Visual Component (Click component to go to code)"
+                  title="Inspect visual component (click component to go to code)"
                 >
-                  🎯 Inspect
+                  Inspect
                 </button>
 
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -320,7 +321,7 @@ export function EditorPane() {
                         )}
                         title={inspectMode ? 'Inspect src/components/Toad.tsx' : undefined}
                       >
-                        🐸
+                        <Toad className="h-7 w-7" />
                       </div>
                     </div>
                     
@@ -368,10 +369,10 @@ export function EditorPane() {
                     <div className="text-[10px] text-zinc-500">
                       {inspectMode ? (
                         <span className="text-[var(--brass)] font-bold animate-pulse">
-                          🎯 INSPECT MODE ACTIVE: Click any highlighted container/element to locate code file.
+                          Inspect mode active: click any highlighted container or element to locate its code file.
                         </span>
                       ) : (
-                        <span>Press <strong>🔄</strong> reload above to restart the simulated process loop.</span>
+                        <span>Press <strong>↻</strong> reload above to restart the simulated process loop.</span>
                       )}
                     </div>
                   </div>
@@ -381,7 +382,7 @@ export function EditorPane() {
                   {inspectMode && (
                     <div className="absolute inset-0 bg-[var(--brass)]/5 pointer-events-none border-2 border-dashed border-[var(--brass)]/30 z-40 flex items-center justify-center">
                       <span className="bg-black/80 text-[var(--brass)] border border-[var(--brass)]/30 px-3 py-1.5 rounded text-xs font-bold font-mono shadow-lg animate-pulse">
-                        🎯 Inspecting sandbox live elements (Click component to edit)
+                        Inspecting sandbox live elements (click component to edit)
                       </span>
                     </div>
                   )}

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import type { AgentRole, PlanStep, TerminalResult } from '@forge/shared'
+import { Toad } from '@/components/Toad'
 import { cn } from '@/lib/cn'
 
 const STEP_ICON: Record<PlanStep['status'], string> = {
@@ -27,18 +28,10 @@ const ROLE_COLOR: Record<AgentRole, string> = {
   browser: 'text-violet-400 border-violet-400/40',
 }
 
-const ROLE_ICON: Record<AgentRole, string> = {
-  orchestrator: '🎯',
-  coder: '💻',
-  verifier: '✅',
-  browser: '🌐',
-}
-
 export function RoleBadge({ role }: { role?: AgentRole }) {
   if (!role) return null
   return (
     <span className={cn('rounded border px-1.5 py-0.5 text-[10px] font-medium flex items-center gap-1', ROLE_COLOR[role])}>
-      <span>{ROLE_ICON[role]}</span>
       {role}
     </span>
   )
@@ -264,7 +257,7 @@ export function MessageBubble({
     <div className={cn('group flex gap-2', isUser ? 'justify-end' : 'justify-start')}>
       {!isUser && (
         <div className="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-[var(--brass)]/10 border border-[var(--brass)]/25 flex items-center justify-center text-[11px]">
-          🐸
+          <Toad className="h-3.5 w-3.5" />
         </div>
       )}
       <div className="flex flex-col gap-0.5 max-w-[88%]">
@@ -304,9 +297,7 @@ export function MessageBubble({
         )}
       </div>
       {isUser && (
-        <div className="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[11px]">
-          👤
-        </div>
+        <div className="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[11px]" />
       )}
     </div>
   )
@@ -371,7 +362,6 @@ export function DiffView({
   return (
     <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
       <div className="flex items-center gap-2 border-b border-white/5 px-3 py-2 bg-black/20">
-        <span className="text-[11px] text-[var(--brass)]">📝</span>
         <span className="font-mono text-[11px] text-zinc-300 truncate">{path}</span>
         <span className="ml-auto shrink-0">
           <RoleBadge role={agent} />
@@ -502,7 +492,7 @@ export function ScreenshotView({
   return (
     <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
       <div className="flex items-center gap-2 border-b border-white/5 px-3 py-2">
-        <span className="text-[12px] text-zinc-300">📸 {label}</span>
+        <span className="text-[12px] text-zinc-300">{label}</span>
         <span className="ml-auto">
           <RoleBadge role={agent} />
         </span>
@@ -535,7 +525,6 @@ export function ApprovalCard({
           : 'border-zinc-700/40 bg-white/[0.02]'
     )}>
       <div className="flex items-start gap-2.5">
-        <span className="text-xl shrink-0 mt-0.5">🛡️</span>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-zinc-100">{action}</div>
           <div className="mt-0.5 text-[12px] text-zinc-400 leading-relaxed">{detail}</div>
@@ -595,7 +584,6 @@ export function SpendApprovalCard({
           : 'border-zinc-700/40 bg-white/[0.02]'
     )}>
       <div className="flex items-start gap-2.5">
-        <span className="text-xl shrink-0 mt-0.5">💳</span>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-zinc-100">Credit Extension Required</div>
           <div className="mt-0.5 text-[12px] text-zinc-400 leading-relaxed">{detail}</div>

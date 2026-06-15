@@ -79,9 +79,7 @@ export default function AdminPage() {
       <div className="flex min-h-dvh flex-col items-center justify-center bg-[var(--background)] px-6 relative overflow-hidden text-center">
         <div className="circuit-grid" />
         <div className="relative z-10 glass-panel p-8 rounded-2xl max-w-sm border-red-500/20 shadow-2xl">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400 border border-red-500/20 mb-4 text-xl">
-            ⚠
-          </div>
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400 border border-red-500/20 mb-4 text-xl" />
           <h1 className="font-cinzel text-lg font-bold text-white mb-2">Access Denied</h1>
           <p className="text-xs text-zinc-400 leading-relaxed mb-6">
             This sector is restricted to administrators. If you believe this is an error, please ensure your email is added to the allowed administrator list.

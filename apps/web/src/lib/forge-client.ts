@@ -5,6 +5,8 @@ import type {
   SpendSummaryDto,
   SessionDto,
   Plan,
+  ReviewVerdict,
+  DeployResult,
 } from '@forge/shared'
 
 export interface Workspace {
@@ -111,9 +113,17 @@ export async function exec(id: string, cmd: string): Promise<ExecResult> {
   })
 }
 
-export async function deployWorkspace(id: string): Promise<{ ok: boolean; url: string; logs: string }> {
+/** Ask Ronald to review the workspace before a deploy. */
+export async function reviewWorkspace(id: string): Promise<ReviewVerdict> {
+  return authed(`/workspaces/${id}/review`, { method: 'POST' })
+}
+
+/** Deploy. Ronald reviews first; pass force to deploy past a not-ready verdict. */
+export async function deployWorkspace(id: string, force = false): Promise<DeployResult> {
   return authed(`/workspaces/${id}/deploy`, {
     method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ force }),
   })
 }
 

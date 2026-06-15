@@ -133,7 +133,7 @@ export default function SettingsPage() {
       setCustomKeysSaved('✓ API Keys updated locally')
       setTimeout(() => setCustomKeysSaved(''), 2500)
     } catch {
-      setCustomKeysSaved('⚠️ Failed to save keys')
+      setCustomKeysSaved('Failed to save keys')
     }
   }
 
@@ -183,11 +183,11 @@ export default function SettingsPage() {
   const isOwner = user?.email.toLowerCase() === 'joejackson80@gmail.com'
 
   const tabs = [
-    { id: 'account', label: '👤 Account & Plan' },
-    { id: 'keys', label: '🔑 API Keys & Custom Model' },
-    { id: 'spend', label: '🔒 Spend & Caps' },
-    { id: 'appearance', label: '🎨 Theme & UX' },
-    { id: 'danger', label: '⚠️ Danger Zone' },
+    { id: 'account', label: 'Account & plan' },
+    { id: 'keys', label: 'API keys & custom model' },
+    { id: 'spend', label: 'Spend & caps' },
+    { id: 'appearance', label: 'Theme & UX' },
+    { id: 'danger', label: 'Danger zone' },
   ] as const
 
   return (
@@ -250,11 +250,11 @@ export default function SettingsPage() {
                     <div>
                       {isOwner ? (
                         <span className="rounded-full bg-amber-500/10 border border-amber-500/25 px-2.5 py-0.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                          👑 Company Owner (Unlimited)
+                          Company Owner (Unlimited)
                         </span>
                       ) : (
                         <span className="rounded-full bg-[var(--brass)]/15 border border-[var(--brass)]/30 px-2.5 py-0.5 text-[10px] font-bold text-[var(--brass)] uppercase tracking-wider">
-                          💼 Pro Builder ($29/mo)
+                          Pro Builder ($29/mo)
                         </span>
                       )}
                     </div>
@@ -356,7 +356,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/30 px-4 py-3 border-t border-white/5">
                   <div>
                     <p className="text-xs font-semibold text-zinc-200">
-                      {unlimitedMode ? '⚡ Unlimited Top-Up Mode' : '🔒 Fixed Credit Limit'}
+                      {unlimitedMode ? 'Unlimited top-up mode' : 'Fixed credit limit'}
                     </p>
                     <p className="text-[10px] text-zinc-500 mt-0.5">
                       {unlimitedMode
@@ -383,7 +383,7 @@ export default function SettingsPage() {
 
                 {showSafety && (
                   <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-3 animate-fade-in">
-                    <p className="text-xs font-bold text-amber-400">⚠️ Enable Unlimited Top-Up Mode?</p>
+                    <p className="text-xs font-bold text-amber-400">Enable unlimited top-up mode?</p>
                     <p className="text-[10px] text-zinc-400 leading-relaxed">
                       In Unlimited Mode, Ronald Forge will pause execution and prompt you for approval before allocating each small credit block.
                       Every credit extension requires an explicit tap to approve.

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import type { ReviewVerdict, ReviewCheck } from '@forge/shared'
 import { useIde } from '@/lib/store'
 import { Toad } from '@/components/Toad'
 import { cn } from '@/lib/cn'
@@ -86,64 +87,64 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
     {
       name: 'File',
       items: [
-        { label: '📄 New File...', action: () => { useAgent.setState((s) => ({ fileVersion: s.fileVersion + 1 })); alert('Use the 📄+ button in the Files sidebar tree to name your new file.'); } },
-        { label: '📁 New Folder...', action: () => { useAgent.setState((s) => ({ fileVersion: s.fileVersion + 1 })); alert('Use the 📁+ button in the Files sidebar tree to name your new folder.'); } },
-        { label: '💾 Save Active File', action: handleSave, disabled: !activePath },
-        { label: '❌ Close Active Tab', action: handleClose, disabled: !activePath },
-        { label: '🚪 Back to Workspaces', action: () => window.location.href = '/workspaces' }
+        { label: 'New file...', action: () => { useAgent.setState((s) => ({ fileVersion: s.fileVersion + 1 })); alert('Use the new-file button in the Files sidebar to name your new file.'); } },
+        { label: 'New folder...', action: () => { useAgent.setState((s) => ({ fileVersion: s.fileVersion + 1 })); alert('Use the new-folder button in the Files sidebar to name your new folder.'); } },
+        { label: 'Save active file', action: handleSave, disabled: !activePath },
+        { label: 'Close active tab', action: handleClose, disabled: !activePath },
+        { label: 'Back to workspaces', action: () => window.location.href = '/workspaces' }
       ]
     },
     {
       name: 'Edit',
       items: [
-        { label: 'Undo Edit', action: () => runEditorAction('undo') },
-        { label: 'Redo Edit', action: () => runEditorAction('redo') },
-        { label: 'Select All', action: () => runEditorAction('editor.action.selectAll') },
-        { label: '🧱 Insert Block Component', action: () => { setActiveTab('blocks'); } }
+        { label: 'Undo edit', action: () => runEditorAction('undo') },
+        { label: 'Redo edit', action: () => runEditorAction('redo') },
+        { label: 'Select all', action: () => runEditorAction('editor.action.selectAll') },
+        { label: 'Insert block component', action: () => { setActiveTab('blocks'); } }
       ]
     },
     {
       name: 'Selection',
       items: [
-        { label: 'Expand Selection', action: () => runEditorAction('editor.action.smartSelect.expand') },
-        { label: 'Shrink Selection', action: () => runEditorAction('editor.action.smartSelect.shrink') }
+        { label: 'Expand selection', action: () => runEditorAction('editor.action.smartSelect.expand') },
+        { label: 'Shrink selection', action: () => runEditorAction('editor.action.smartSelect.shrink') }
       ]
     },
     {
       name: 'View',
       items: [
-        { label: activeTab === 'files' ? '✓ Files Tab' : '📁 Files Tab', action: () => setActiveTab('files') },
-        { label: activeTab === 'blocks' ? '✓ Blocks Tab' : '🧱 Blocks Tab', action: () => setActiveTab('blocks') },
-        { label: viewMode === 'editor' ? '✓ Code Editor' : '💻 Code Editor', action: () => setViewMode('editor') },
-        { label: viewMode === 'browser' ? '✓ Live Preview' : '🌐 Live Preview', action: () => setViewMode('browser') },
-        { label: `Toggle Theme (${theme === 'slate' ? 'Slate' : 'Steampunk'})`, action: () => setTheme(theme === 'slate' ? 'steampunk' : 'slate') }
+        { label: activeTab === 'files' ? 'Files tab (active)' : 'Files tab', action: () => setActiveTab('files') },
+        { label: activeTab === 'blocks' ? 'Blocks tab (active)' : 'Blocks tab', action: () => setActiveTab('blocks') },
+        { label: viewMode === 'editor' ? 'Code editor (active)' : 'Code editor', action: () => setViewMode('editor') },
+        { label: viewMode === 'browser' ? 'Live preview (active)' : 'Live preview', action: () => setViewMode('browser') },
+        { label: `Toggle theme (${theme === 'slate' ? 'slate' : 'steampunk'})`, action: () => setTheme(theme === 'slate' ? 'steampunk' : 'slate') }
       ]
     },
     {
       name: 'Go',
       items: [
-        { label: 'Go to Line...', action: handleGoToLine, disabled: !editorInstance }
+        { label: 'Go to line...', action: handleGoToLine, disabled: !editorInstance }
       ]
     },
     {
       name: 'Run',
       items: [
-        { label: '🚀 Deploy Workspace', action: handleDeploy },
-        { label: '🧪 Run Unit Tests', action: handleRunTests },
-        { label: '🔄 Reload Preview', action: () => { setViewMode('browser'); window.location.reload(); } }
+        { label: 'Review and deploy', action: () => handleDeploy() },
+        { label: 'Run unit tests', action: handleRunTests },
+        { label: 'Reload preview', action: () => { setViewMode('browser'); window.location.reload(); } }
       ]
     },
     {
       name: 'Terminal',
       items: [
-        { label: 'Clear Console', action: () => alert('Terminal console reset complete.') }
+        { label: 'Clear console', action: () => alert('Terminal console reset complete.') }
       ]
     },
     {
       name: 'Help',
       items: [
-        { label: '💡 Keyboard Shortcuts', action: () => { setActiveMenu(null); setShowShortcuts(true); } },
-        { label: '🐸 About SaaSyToad Forge', action: () => { setActiveMenu(null); setShowAbout(true); } }
+        { label: 'Keyboard shortcuts', action: () => { setActiveMenu(null); setShowShortcuts(true); } },
+        { label: 'About SaaSyToad Forge', action: () => { setActiveMenu(null); setShowAbout(true); } }
       ]
     }
   ]
@@ -199,8 +200,8 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
           <div className="w-full max-w-sm rounded-xl border border-[var(--brass)]/25 bg-[#0e0e12] p-6 text-center shadow-2xl space-y-4 animate-slide-up relative">
             <div className="circuit-grid opacity-10" />
             <div className="flex justify-center">
-              <div className="h-16 w-16 rounded-full bg-[var(--brass)]/10 border border-[var(--brass)]/30 flex items-center justify-center text-4xl animate-bounce">
-                🐸
+              <div className="h-16 w-16 rounded-full bg-[var(--brass)]/10 border border-[var(--brass)]/30 flex items-center justify-center animate-bounce">
+                <Toad className="h-9 w-9" />
               </div>
             </div>
             
@@ -297,9 +298,9 @@ const LANG_ICONS: Record<string, string> = {
   css: '/* */ CSS',
   html: '⟨/⟩ HTML',
   json: '{ } JSON',
-  markdown: '📝 Markdown',
-  python: '🐍 Python',
-  plaintext: '📄 Plain Text',
+  markdown: 'Markdown',
+  python: 'Python',
+  plaintext: 'Plain text',
 }
 
 function IdeStatusBar({ workspaceId }: { workspaceId: string }) {
@@ -422,10 +423,14 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
   const setTheme = useIde((s) => s.setTheme)
   const [activeTab, setActiveTab] = useState<'files' | 'blocks'>('files')
 
-  // Deployment states
-  const [deployState, setDeployState] = useState<'idle' | 'deploying' | 'success' | 'failed'>('idle')
+  // Deploy + Ronald review states
+  const [deployState, setDeployState] = useState<
+    'idle' | 'reviewing' | 'success' | 'blocked' | 'simulated' | 'failed'
+  >('idle')
   const [deployUrl, setDeployUrl] = useState('')
   const [deployLogs, setDeployLogs] = useState('')
+  const [verdict, setVerdict] = useState<ReviewVerdict | null>(null)
+  const [deployError, setDeployError] = useState('')
   const [showDeployModal, setShowDeployModal] = useState(false)
 
   useEffect(() => {
@@ -435,22 +440,29 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
     setTheme(saved)
   }, [workspaceId, setWorkspace, setTheme])
 
-  async function handleDeploy() {
-    setDeployState('deploying')
-    setDeployLogs('Booting build runner in sandbox VM...\n')
+  // Ronald reviews the build first; force skips a not-ready verdict and deploys anyway.
+  async function handleDeploy(force = false) {
+    setShowDeployModal(true)
+    setDeployState('reviewing')
+    setDeployError('')
+    setDeployLogs(force ? 'Deploying past the review...' : 'Ronald is checking your build...')
     try {
-      const res = await client.deployWorkspace(workspaceId)
-      if (res.ok) {
+      const res = await client.deployWorkspace(workspaceId, force)
+      setVerdict(res.verdict)
+      setDeployLogs(res.logs ?? '')
+      if (res.blocked) {
+        setDeployState('blocked')
+      } else if (res.deployed) {
+        setDeployUrl(res.url ?? '')
         setDeployState('success')
-        setDeployUrl(res.url)
-        setDeployLogs(res.logs || '✓ Build passed\n✓ Uploaded bundle\n✓ Deployment successful!')
+      } else if (res.simulated) {
+        setDeployState('simulated')
       } else {
         setDeployState('failed')
-        setDeployLogs(res.logs || '⚠️ Build failed. Check compiler errors.')
       }
     } catch (err) {
+      setDeployError(err instanceof Error ? err.message : String(err))
       setDeployState('failed')
-      setDeployLogs(`Deploy failed: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -489,37 +501,57 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
           className="ml-auto text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-[var(--brass)] cursor-pointer flex items-center gap-1 border border-white/5 px-2 py-0.5 rounded bg-white/[0.02] shrink-0 select-none"
           title="Toggle UI Layout Theme"
         >
-          {theme === 'slate' ? '⚙️ Steampunk UI' : '💻 Modern UI'}
+          {theme === 'slate' ? 'Steampunk UI' : 'Modern UI'}
         </button>
 
         <span className="text-zinc-850 select-none">|</span>
 
-        {/* One-Click Deploy controls */}
+        {/* Deploy controls (Ronald reviews first) */}
         <div className="flex items-center gap-2 select-none shrink-0">
-          {deployState === 'idle' && (
+          {(deployState === 'idle' || deployState === 'failed') && (
             <button
               type="button"
-              onClick={handleDeploy}
+              onClick={() => void handleDeploy(false)}
               className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition cursor-pointer bg-[var(--brass)] text-black hover:brightness-110 shadow-md shadow-[var(--brass)]/10"
-              title="Verify compiler build and host public deployment"
+              title="Ronald reviews the build, then deploys"
             >
-              🚀 Deploy App
+              Review and deploy
             </button>
           )}
-          {deployState === 'deploying' && (
+          {deployState === 'reviewing' && (
             <button
               type="button"
               onClick={() => setShowDeployModal(true)}
-              className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer bg-zinc-800 text-[var(--brass)] border border-[var(--brass)]/30 animate-pulse flex items-center gap-1"
-              title="View ongoing build process"
+              className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer bg-zinc-800 text-[var(--brass)] border border-[var(--brass)]/30 flex items-center gap-1.5"
+              title="Ronald is reviewing"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)] animate-ping" />
-              <span>Deploying...</span>
+              <span>Reviewing...</span>
+            </button>
+          )}
+          {deployState === 'blocked' && (
+            <button
+              type="button"
+              onClick={() => setShowDeployModal(true)}
+              className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-0.5 text-[10px] text-amber-400 font-bold cursor-pointer hover:brightness-110"
+              title="Ronald found blockers"
+            >
+              Review held: see Ronald
+            </button>
+          )}
+          {deployState === 'simulated' && (
+            <button
+              type="button"
+              onClick={() => setShowDeployModal(true)}
+              className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/30 rounded px-2 py-0.5 text-[10px] text-sky-400 font-bold cursor-pointer hover:brightness-110"
+              title="Reviewed on the mock sandbox"
+            >
+              Reviewed (mock sandbox)
             </button>
           )}
           {deployState === 'success' && (
             <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-0.5 text-[10px] text-emerald-400">
-              <span className="font-semibold">✓ Deployed</span>
+              <span className="font-semibold">Deployed</span>
               <span className="text-zinc-700">|</span>
               <a
                 href={deployUrl}
@@ -527,7 +559,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
                 rel="noopener noreferrer"
                 className="font-bold underline hover:text-white transition"
               >
-                Open App
+                Open app
               </a>
               <span className="text-zinc-700">|</span>
               <button
@@ -535,28 +567,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
                 onClick={() => setShowDeployModal(true)}
                 className="text-[9px] text-zinc-400 hover:text-zinc-200 transition font-bold underline cursor-pointer"
               >
-                Logs
-              </button>
-            </div>
-          )}
-          {deployState === 'failed' && (
-            <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/30 rounded px-2 py-0.5 text-[10px] text-red-400">
-              <span className="font-semibold">⚠️ Failed</span>
-              <span className="text-zinc-700">|</span>
-              <button
-                type="button"
-                onClick={() => setShowDeployModal(true)}
-                className="font-bold underline hover:text-white transition cursor-pointer"
-              >
-                Logs
-              </button>
-              <span className="text-zinc-700">|</span>
-              <button
-                type="button"
-                onClick={handleDeploy}
-                className="font-bold underline hover:text-white transition cursor-pointer"
-              >
-                Retry
+                Review
               </button>
             </div>
           )}
@@ -589,7 +600,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
                   : 'border-transparent text-zinc-500 hover:text-zinc-300'
               )}
             >
-              📁 Files
+              Files
             </button>
             <button
               type="button"
@@ -601,7 +612,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
                   : 'border-transparent text-zinc-500 hover:text-zinc-300'
               )}
             >
-              🧱 Blocks
+              Blocks
             </button>
           </div>
 
@@ -628,32 +639,97 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
         </aside>
       </div>
 
-      {/* Deployment build logs modal */}
+      {/* Ronald's pre-deploy review modal */}
       {showDeployModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs select-none animate-fade-in">
-          <div className="w-full max-w-lg rounded-xl border border-white/10 bg-[#0e0e12] p-5 shadow-2xl space-y-4 animate-slide-up">
-            <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
-              <h3 className="font-cinzel text-xs font-bold text-zinc-200 tracking-wider">
-                Deployment Build Pipeline Logs
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs select-none animate-fade-in p-4">
+          <div className="w-full max-w-lg rounded-xl border border-white/10 bg-[#0e0e12] p-5 shadow-2xl space-y-4 animate-slide-up max-h-[88vh] overflow-y-auto">
+            <div className="flex items-center gap-2.5 border-b border-white/5 pb-3">
+              <div className="h-8 w-8 rounded-full bg-[var(--brass)]/10 border border-[var(--brass)]/30 flex items-center justify-center shrink-0">
+                <Toad className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-cinzel text-sm font-bold text-zinc-100 tracking-wider">Ronald&apos;s review</h3>
+                <p className="text-[10px] text-zinc-500">A quick check before you ship.</p>
+              </div>
+              {verdict && (
+                <span
+                  className={cn(
+                    'ml-auto shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold tabular-nums',
+                    verdict.ready
+                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                      : 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+                  )}
+                >
+                  {verdict.score}/100
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => setShowDeployModal(false)}
-                className="text-zinc-400 hover:text-zinc-200 text-lg font-bold cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-200 text-lg font-bold cursor-pointer ml-1 shrink-0"
+                aria-label="Close"
               >
                 ×
               </button>
             </div>
-            <pre className="rounded bg-black p-3.5 font-mono text-[10px] text-emerald-400 overflow-auto max-h-[300px] border border-white/5 whitespace-pre-wrap">
-              {deployLogs || 'Initializing build runner...'}
-            </pre>
-            <div className="flex justify-end pt-1">
+
+            {deployState === 'reviewing' ? (
+              <div className="flex items-center gap-2 py-6 justify-center text-xs text-zinc-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)] animate-ping" />
+                {deployLogs || 'Ronald is checking your build...'}
+              </div>
+            ) : verdict ? (
+              <RonaldVerdictView verdict={verdict} />
+            ) : deployError ? (
+              <p className="text-xs text-red-400 py-4">{deployError}</p>
+            ) : null}
+
+            {deployState === 'success' && deployUrl && (
+              <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2.5 text-xs text-emerald-300 flex items-center gap-2">
+                <span className="font-semibold text-emerald-400">Deployed.</span>
+                <a href={deployUrl} target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-white">
+                  Open app
+                </a>
+              </div>
+            )}
+
+            {deployState === 'simulated' && (
+              <p className="text-[11px] text-sky-300/90 leading-relaxed rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2.5">
+                {deployLogs || 'This workspace runs on the mock sandbox, so no real deployment was performed. Connect a real sandbox to build and host it.'}
+              </p>
+            )}
+
+            {deployLogs && (deployState === 'success' || deployState === 'failed') && (
+              <pre className="rounded bg-black p-3 font-mono text-[10px] text-zinc-400 overflow-auto max-h-[180px] border border-white/5 whitespace-pre-wrap">
+                {deployLogs}
+              </pre>
+            )}
+
+            <div className="flex justify-end gap-2 pt-1">
+              {deployState === 'blocked' && (
+                <button
+                  type="button"
+                  onClick={() => void handleDeploy(true)}
+                  className="rounded-lg bg-amber-500/90 hover:bg-amber-500 text-black px-4 py-1.5 text-xs font-bold transition cursor-pointer"
+                >
+                  Deploy anyway
+                </button>
+              )}
+              {deployState === 'failed' && (
+                <button
+                  type="button"
+                  onClick={() => void handleDeploy(false)}
+                  className="rounded-lg bg-[var(--brass)] hover:brightness-110 text-black px-4 py-1.5 text-xs font-bold transition cursor-pointer"
+                >
+                  Try again
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowDeployModal(false)}
-                className="rounded bg-zinc-800 border border-zinc-700 hover:border-zinc-555 px-4 py-1.5 text-xs font-semibold text-zinc-200 transition cursor-pointer"
+                className="rounded bg-zinc-800 border border-zinc-700 hover:border-zinc-600 px-4 py-1.5 text-xs font-semibold text-zinc-200 transition cursor-pointer"
               >
-                Close Logs
+                Close
               </button>
             </div>
           </div>
@@ -662,6 +738,63 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
 
       {/* VS Code-style status bar */}
       <IdeStatusBar workspaceId={workspaceId} />
+    </div>
+  )
+}
+
+const CHECK_STYLE: Record<ReviewCheck['status'], { label: string; cls: string }> = {
+  pass: { label: 'pass', cls: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' },
+  fail: { label: 'fail', cls: 'text-red-400 border-red-500/30 bg-red-500/10' },
+  warn: { label: 'warn', cls: 'text-amber-400 border-amber-500/30 bg-amber-500/10' },
+  skip: { label: 'skip', cls: 'text-zinc-400 border-white/10 bg-white/5' },
+}
+
+function RonaldVerdictView({ verdict }: { verdict: ReviewVerdict }) {
+  return (
+    <div className="space-y-3.5">
+      <p className="text-[13px] leading-relaxed text-zinc-200">{verdict.summary}</p>
+
+      <div className="space-y-1.5">
+        {verdict.checks.map((check, i) => {
+          const style = CHECK_STYLE[check.status]
+          return (
+            <div key={i} className="flex items-start gap-2 text-[12px]">
+              <span
+                className={cn(
+                  'shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider w-11 text-center',
+                  style.cls,
+                )}
+              >
+                {style.label}
+              </span>
+              <span className="text-zinc-300 font-medium">{check.name}</span>
+              <span className="text-zinc-550 text-[11px] truncate">{check.detail}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {verdict.blockers.length > 0 && (
+        <div className="rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2.5 space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">What is missing</p>
+          <ul className="list-disc pl-4 space-y-1 text-[12px] text-zinc-300">
+            {verdict.blockers.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {verdict.recommendations.length > 0 && (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-450">Worth doing</p>
+          <ul className="list-disc pl-4 space-y-1 text-[12px] text-zinc-400">
+            {verdict.recommendations.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

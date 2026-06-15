@@ -27,7 +27,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     category: 'Database & Auth',
     description: 'PostgreSQL database, user authentication, row-level security, and real-time backend structures.',
     secretKey: 'supabase',
-    icon: '⚡',
+    icon: '',
     command: 'stripe projects add supabase',
     docUrl: 'https://supabase.com/docs',
   },
@@ -37,7 +37,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     category: 'Secure Code Execution',
     description: 'Secure, sandboxed browser and terminal execution microVM environments for AI agents.',
     secretKey: 'e2b',
-    icon: '📦',
+    icon: '',
     command: 'stripe projects add e2b',
     docUrl: 'https://e2b.dev/docs',
   },
@@ -47,7 +47,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     category: 'Billing & Subscriptions',
     description: 'Accept customer payments, manage subscriptions, and verify checkout webhooks.',
     secretKey: 'stripe',
-    icon: '💳',
+    icon: '',
     command: 'stripe projects add stripe',
     docUrl: 'https://docs.stripe.com',
   },
@@ -57,7 +57,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     category: 'Caching & Queues',
     description: 'Low-latency serverless Redis database for state storage, caching, and worker message queues.',
     secretKey: 'upstashRedis',
-    icon: '🔴',
+    icon: '',
     command: 'stripe projects add upstash-redis',
     docUrl: 'https://upstash.com/docs',
   },
@@ -87,7 +87,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     category: 'Integrations & Workflows',
     description: 'Connect database, queues, and sandbox app triggers directly to over 8,000+ API apps via webhook workflows.',
     secretKey: 'zapier',
-    icon: '🧡',
+    icon: '',
     command: 'stripe projects add zapier',
     docUrl: 'https://zapier.com/developer',
   },
@@ -244,7 +244,7 @@ export default function DashboardPage() {
               onClick={toggleTheme}
               className="rounded-md border border-white/5 bg-white/[0.02] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-zinc-400 hover:text-[var(--brass)] cursor-pointer"
             >
-              {theme === 'slate' ? '⚙️ Steampunk UI' : '💻 Modern UI'}
+              {theme === 'slate' ? 'Steampunk UI' : 'Modern UI'}
             </button>
             
             <span className="text-zinc-650">|</span>

@@ -77,7 +77,6 @@ function SignInForm() {
         {/* Owner account banner */}
         {isOwner && (
           <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-[var(--brass)]/30 bg-[var(--brass)]/8 px-3.5 py-3">
-            <span className="text-lg shrink-0">👑</span>
             <div>
               <p className="text-[12px] font-bold text-[var(--brass)] leading-snug">Company Owner Account</p>
               <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
@@ -171,8 +170,8 @@ function SignInForm() {
             ) : (
               <span>
                 {mode === 'signin'
-                  ? isOwner ? '👑 Sign in as Owner' : 'Sign in'
-                  : isOwner ? '👑 Create Owner Account' : 'Create account'}
+                  ? isOwner ? 'Sign in as owner' : 'Sign in'
+                  : isOwner ? 'Create owner account' : 'Create account'}
               </span>
             )}
           </button>
@@ -199,7 +198,7 @@ function SignInForm() {
               onClick={() => setEmail(OWNER_EMAIL)}
               className="text-[10px] text-[var(--brass)]/60 hover:text-[var(--brass)] transition cursor-pointer"
             >
-              👑 Set up owner account
+              Set up owner account
             </button>
           )}
         </div>

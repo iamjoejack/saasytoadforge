@@ -141,7 +141,7 @@ function ZapierPanel({ workspaceId }: { workspaceId: string }) {
       setTriggerLogs((p) => p + `✓ Trigger sent:\n${JSON.stringify(payload, null, 2)}\n\nZapier trigger success!`)
     } catch (err) {
       setTriggerStatus('failed')
-      setTriggerLogs((p) => p + `❌ Failed: ${err instanceof Error ? err.message : String(err)}`)
+      setTriggerLogs((p) => p + `Failed: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -181,7 +181,7 @@ function ZapierPanel({ workspaceId }: { workspaceId: string }) {
         onClick={handleSendTrigger}
         className="w-full rounded-lg bg-zinc-800 text-[var(--brass)] border border-[var(--brass)]/30 hover:bg-zinc-750 px-3 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer disabled:opacity-50 transition"
       >
-        {triggerStatus === 'sending' ? '⏳ Sending…' : '🚀 Fire Webhook'}
+        {triggerStatus === 'sending' ? 'Sending…' : 'Fire webhook'}
       </button>
       {triggerLogs && (
         <div className="border-t border-white/5 pt-3 flex flex-col min-h-[160px] flex-1">
@@ -252,12 +252,12 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
   const [suggestFiles, setSuggestFiles] = useState<string[]>([])
 
   const COMMANDS = useMemo(() => [
-    { id: '/goal', label: '🎯 /goal <task>', desc: 'Run a thorough, goal-driven task' },
-    { id: '/explain', label: '📖 /explain <file>', desc: 'Ask the agent to explain a file' },
-    { id: '/write-tests', label: '🧪 /write-tests <file>', desc: 'Ask the agent to write tests' },
-    { id: '/clear', label: '🗑 /clear', desc: 'Clear the chat timeline history' },
-    { id: '/stop', label: '⏹ /stop', desc: 'Stop the active agent execution' },
-    { id: '/help', label: '❓ /help', desc: 'Display a list of commands' },
+    { id: '/goal', label: '/goal <task>', desc: 'Run a thorough, goal-driven task' },
+    { id: '/explain', label: '/explain <file>', desc: 'Ask the agent to explain a file' },
+    { id: '/write-tests', label: '/write-tests <file>', desc: 'Ask the agent to write tests' },
+    { id: '/clear', label: '/clear', desc: 'Clear the chat timeline history' },
+    { id: '/stop', label: '/stop', desc: 'Stop the active agent execution' },
+    { id: '/help', label: '/help', desc: 'Display a list of commands' },
   ], [])
 
   const filteredFiles = useMemo(() => {
@@ -544,7 +544,7 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
               : 'border-transparent text-zinc-500 hover:text-zinc-350'
           )}
         >
-          🤖 Agent
+          Agent
         </button>
         <button
           type="button"
@@ -556,7 +556,7 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
               : 'border-transparent text-zinc-500 hover:text-zinc-350'
           )}
         >
-          📋 Sessions
+          Sessions
         </button>
         <button
           type="button"
@@ -568,7 +568,7 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
               : 'border-transparent text-zinc-500 hover:text-zinc-350'
           )}
         >
-          🧡 Zapier
+          Zapier
         </button>
       </div>
 
@@ -610,7 +610,7 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                 title="Clear conversation"
                 className="ml-1 text-[10px] text-zinc-600 hover:text-zinc-400 transition cursor-pointer px-1.5 py-0.5 rounded hover:bg-white/5"
               >
-                🗑 Clear
+                Clear
               </button>
             )}
             {/* Stop button */}
@@ -620,7 +620,7 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                 onClick={cancelRun}
                 className="ml-1 text-[10px] font-bold text-red-400 hover:text-red-300 transition cursor-pointer px-2 py-0.5 rounded border border-red-500/30 bg-red-500/10 hover:bg-red-500/15"
               >
-                ⏹ Stop
+                Stop
               </button>
             )}
           </div>
@@ -733,7 +733,6 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                     case 'error':
                       return (
                         <div key={item.id} className="rounded-xl bg-red-500/10 border border-red-500/25 px-3.5 py-3 text-[13px] text-red-400 flex items-start gap-2">
-                          <span className="shrink-0">⚠️</span>
                           <div className="flex-1">
                             <span>{item.text}</span>
                             {item.text && (
@@ -778,7 +777,6 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                       i === suggestIndex ? 'bg-[var(--brass)]/15 text-[var(--brass)] font-semibold' : 'text-zinc-350 hover:bg-white/[0.03]'
                     )}
                   >
-                    <span>📄</span>
                     <span className="truncate">{file}</span>
                   </button>
                 ))}
@@ -811,7 +809,7 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
               <div className="mb-2 flex flex-wrap gap-1.5 select-none">
                 {attachedFiles.map((file) => (
                   <span key={file} className="inline-flex items-center gap-1 rounded bg-zinc-800 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300">
-                    <span>📄 {file}</span>
+                    <span>{file}</span>
                     <button
                       type="button"
                       onClick={() => setAttachedFiles((prev) => prev.filter((f) => f !== file))}
@@ -890,10 +888,10 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                 className="rounded-lg bg-black/60 border border-white/10 px-2 py-0.5 text-[10px] text-zinc-400 focus:border-[var(--brass)]/30 focus:outline-none cursor-pointer hover:border-white/15 transition appearance-none"
                 style={{ paddingRight: '18px', backgroundImage: `url("data:image/svg+xml,%3Csvg fill='%23666' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', backgroundSize: '12px' }}
               >
-                <option value="fusion">🔮 Fusion (3-Model Panel)</option>
-                <option value="frontier">🧠 Frontier (Sonnet)</option>
-                <option value="fast">⚡ Fast (GPT-4o Mini)</option>
-                <option value="custom">🔑 Custom Model</option>
+                <option value="fusion">Fusion (3-model panel)</option>
+                <option value="frontier">Frontier (Sonnet)</option>
+                <option value="fast">Fast (GPT-4o mini)</option>
+                <option value="custom">Custom model</option>
               </select>
 
               {/* Custom Model ID Entry */}
