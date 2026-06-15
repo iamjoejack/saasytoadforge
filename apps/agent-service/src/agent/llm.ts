@@ -34,8 +34,7 @@ export class MockLlmClient implements LlmClient {
 
 /**
  * OpenRouter-backed client (chat completions, SSE streaming). Only constructed when a
- * key is present; callers should fall back to MockLlmClient otherwise.
- * HUMAN-INPUT NEEDED: OPENROUTER_API_KEY.
+ * key is present; callers fall back to MockLlmClient otherwise.
  */
 export class OpenRouterLlmClient implements LlmClient {
   readonly kind = 'openrouter' as const

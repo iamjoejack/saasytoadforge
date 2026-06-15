@@ -35,6 +35,7 @@ export type AgentCommand =
   | { type: 'task'; task: string; requireWriteApproval?: boolean; deep?: boolean }
   | { type: 'approve'; id: string }
   | { type: 'reject'; id: string }
+  | { type: 'cancel' }
 
 export interface ConfigSummary {
   models: ModelRouting

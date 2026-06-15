@@ -49,7 +49,23 @@ export function parseServerEnv(raw: NodeJS.ProcessEnv = process.env): ServerEnv 
   for (const [key, value] of Object.entries(raw)) {
     cleaned[key] = value === '' ? undefined : value
   }
-  return serverEnvSchema.parse(cleaned)
+  const env = serverEnvSchema.parse(cleaned)
+
+  // Refuse to boot with the public dev secret in production - it would let anyone forge
+  // a token for any user and defeat tenant isolation.
+  if (env.NODE_ENV === 'production') {
+    if (env.AGENT_SERVICE_SECRET === DEFAULT_AGENT_SERVICE_SECRET) {
+      throw new Error(
+        'AGENT_SERVICE_SECRET must be set to a strong, unique value in production (the default is public).',
+      )
+    }
+    if (env.ALLOWED_ORIGINS.trim() === '') {
+      console.warn(
+        '[env] ALLOWED_ORIGINS is empty in production; CORS will reject the deployed web app. Set it to the web origin.',
+      )
+    }
+  }
+  return env
 }
 
 export interface SecretStatus {

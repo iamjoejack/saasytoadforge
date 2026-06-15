@@ -9,6 +9,7 @@ import type {
   SandboxProvider,
 } from '@forge/shared'
 import { Pushable } from './pushable'
+import { assertSafePath } from '../lib/paths'
 
 const DEFAULT_TEMPLATE = 'base'
 const DEFAULT_SANDBOX_TIMEOUT_MS = 5 * 60_000
@@ -63,15 +64,15 @@ export class E2BSandboxProvider implements SandboxProvider {
   }
 
   async writeFile(id: string, path: string, contents: string): Promise<void> {
-    await this.get(id).files.write(path, contents)
+    await this.get(id).files.write(assertSafePath(path), contents)
   }
 
   async readFile(id: string, path: string): Promise<string> {
-    return this.get(id).files.read(path)
+    return this.get(id).files.read(assertSafePath(path))
   }
 
   async listFiles(id: string, dir: string): Promise<FileEntry[]> {
-    const entries = await this.get(id).files.list(dir || '.')
+    const entries = await this.get(id).files.list(dir ? assertSafePath(dir) : '.')
     return entries.map((entry) => ({
       path: entry.path,
       name: entry.name,

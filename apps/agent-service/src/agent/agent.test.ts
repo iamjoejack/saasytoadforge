@@ -98,6 +98,23 @@ describe('Agent loop (mock)', () => {
     expect(await provider.readFile(sandboxId, 'src/time.mjs')).toContain('currentTime')
   })
 
+  it('emits error then done(ok:false) when the planner fails', async () => {
+    const { agent } = await setup()
+    const events: AgentEvent[] = []
+    const failing = {
+      kind: 'mock' as const,
+      plan: () => Promise.reject(new Error('planner exploded')),
+    }
+    const { ok } = await agent.run(
+      { task: 'anything', planner: failing, approvals: new ApprovalGate() },
+      (e) => events.push(e),
+    )
+    expect(ok).toBe(false)
+    expect(events.some((e) => e.type === 'error')).toBe(true)
+    const done = events.at(-1)
+    expect(done?.type === 'done' && done.ok).toBe(false)
+  })
+
   it('skips the write and fails the run when approval is rejected', async () => {
     const { provider, sandboxId, agent } = await setup()
     const gate = new ApprovalGate()

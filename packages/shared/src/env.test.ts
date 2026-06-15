@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { parseServerEnv, secretStatus, parseEgressAllowlist } from './env'
+import {
+  parseServerEnv,
+  secretStatus,
+  parseEgressAllowlist,
+  DEFAULT_AGENT_SERVICE_SECRET,
+} from './env'
 
 describe('serverEnv', () => {
   it('applies safe defaults when secrets are absent', () => {
@@ -45,5 +50,26 @@ describe('serverEnv', () => {
 
   it('defaults the egress allowlist to empty (default-deny)', () => {
     expect(parseEgressAllowlist(parseServerEnv({}))).toEqual([])
+  })
+
+  it('refuses the public default AGENT_SERVICE_SECRET in production', () => {
+    expect(() => parseServerEnv({ NODE_ENV: 'production' } as NodeJS.ProcessEnv)).toThrow(
+      /AGENT_SERVICE_SECRET/,
+    )
+    expect(() =>
+      parseServerEnv({
+        NODE_ENV: 'production',
+        AGENT_SERVICE_SECRET: DEFAULT_AGENT_SERVICE_SECRET,
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/AGENT_SERVICE_SECRET/)
+  })
+
+  it('accepts a custom secret in production', () => {
+    const env = parseServerEnv({
+      NODE_ENV: 'production',
+      AGENT_SERVICE_SECRET: 'a-strong-unique-secret',
+      ALLOWED_ORIGINS: 'https://forge.example.com',
+    } as NodeJS.ProcessEnv)
+    expect(env.AGENT_SERVICE_SECRET).toBe('a-strong-unique-secret')
   })
 })

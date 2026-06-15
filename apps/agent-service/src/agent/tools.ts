@@ -1,4 +1,5 @@
 import type { ExecResult, FileEntry, SandboxProvider } from '@forge/shared'
+import { assertSafePath } from '../lib/paths'
 
 /**
  * The scoped tool surface the agent is allowed to use (mission section 10):
@@ -34,9 +35,10 @@ export function createToolSet(
 ): ToolSet {
   return {
     fs: {
-      read: (path) => provider.readFile(sandboxId, path),
-      write: (path, contents) => provider.writeFile(sandboxId, path, contents),
-      list: (dir) => provider.listFiles(sandboxId, dir),
+      // Scope every agent-driven path to the workspace root (reject ../ and absolute paths).
+      read: (path) => provider.readFile(sandboxId, assertSafePath(path)),
+      write: (path, contents) => provider.writeFile(sandboxId, assertSafePath(path), contents),
+      list: (dir) => provider.listFiles(sandboxId, dir === '' ? '' : assertSafePath(dir)),
     },
     terminal: { exec: (cmd) => provider.exec(sandboxId, cmd) },
     browser,

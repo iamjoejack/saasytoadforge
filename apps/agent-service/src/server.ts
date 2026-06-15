@@ -25,7 +25,7 @@ import { createLlmClient } from './agent/llm'
 import { createPlanner } from './agent/planner'
 import { createToolSet, MockBrowserTool, type BrowserTool } from './agent/tools'
 import { SpendLedger, costForTokens, type SpendCaps } from './lib/spend'
-import { modelRouting, resolveDeepModel } from './agent/router'
+import { modelRouting, resolveDeepModel, DEEP_REQUEST_CAP_USD } from './agent/router'
 import { logger } from './lib/logger'
 import { createBillingProvider } from './billing/billing'
 import { InMemorySessionStore } from './persistence/store'
@@ -43,6 +43,11 @@ export interface ServerDeps {
 }
 
 const PUBLIC_PATHS = new Set(['/health', '/config', '/billing/plans'])
+const WS_ROUTE = /\/workspaces\/[^/]+\/(shell|agent)$/
+
+/** Estimated tokens per agent run, feeding the spend-cap pre-charge. */
+const FRONTIER_EST_TOKENS = 2300
+const DEEP_EST_TOKENS = 9000
 
 export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
   const env = parseServerEnv()
@@ -94,8 +99,10 @@ function routes(
     // Websocket upgrades authenticate via ?token= in their own handlers.
     app.addHook('onRequest', async (req, reply) => {
       if (req.method === 'OPTIONS') return // CORS preflight
-      if ((req.headers.upgrade ?? '').toLowerCase() === 'websocket') return
       const path = req.url.split('?')[0] ?? ''
+      // Skip ONLY a genuine websocket upgrade to a websocket route (it authenticates via
+      // ?token= in its handler). A spoofed Upgrade header on a REST route must still auth.
+      if (WS_ROUTE.test(path) && (req.headers.upgrade ?? '').toLowerCase() === 'websocket') return
       if (PUBLIC_PATHS.has(path)) return
       const header = req.headers.authorization ?? ''
       const token = header.startsWith('Bearer ') ? header.slice(7) : ''
@@ -120,8 +127,8 @@ function routes(
 
     app.post('/billing/checkout', async (req, reply) => {
       const body = req.body as { planId?: unknown; email?: unknown }
-      if (typeof body.planId !== 'string') {
-        return reply.code(400).send({ error: 'planId is required' })
+      if (typeof body.planId !== 'string' || !billing.plans().some((p) => p.id === body.planId)) {
+        return reply.code(400).send({ error: 'unknown planId' })
       }
       const email = typeof body.email === 'string' ? body.email : 'unknown@forge.dev'
       return billing.createCheckout(body.planId, { customerEmail: email })
@@ -246,14 +253,18 @@ function routes(
       const agent = new Agent(createToolSet(provider, ws.sandboxId, browser))
       let activeSessionId: string | null = null
       let running = false
+      let abort: AbortController | null = null
 
       const send = (event: AgentEvent) => {
         if (activeSessionId) sessionStore.appendArtifact(activeSessionId, event)
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event))
       }
 
-      // Unblock the loop if the client disconnects mid-approval.
-      socket.on('close', () => approvals.rejectAll())
+      // On disconnect: stop the in-flight run and unblock any pending approval.
+      socket.on('close', () => {
+        abort?.abort()
+        approvals.rejectAll()
+      })
 
       socket.on('message', (data: Buffer) => {
         let cmd: AgentCommand
@@ -263,54 +274,77 @@ function routes(
           return
         }
 
-        if (cmd.type === 'task') {
-          if (running) {
-            send({ type: 'error', message: 'a task is already running' })
-            send({ type: 'done', ok: false })
-            return
-          }
-          const model = cmd.deep
-            ? resolveDeepModel(env, { fusionAvailable: secrets.openrouter })
-            : modelRouting(env).frontier
-          const estUsd = costForTokens(model, cmd.deep ? 9000 : 2300)
-
-          // Enforce the per-user spend cap BEFORE the model call.
-          const check = ledger.check(userId, estUsd, caps)
-          if (!check.allowed) {
-            send({ type: 'error', message: `Spend cap reached: ${check.reason}.` })
-            send({ type: 'done', ok: false })
-            return
-          }
-          ledger.record(userId, estUsd)
-          running = true
-          activeSessionId = sessionStore.createSession(ws.id, cmd.task).id
-          logger.info('agent run', {
-            workspace: ws.id,
-            session: activeSessionId,
-            model,
-            deep: Boolean(cmd.deep),
-            estUsd,
-          })
-
-          const planner = createPlanner(env, createLlmClient(env))
-          void agent
-            .run(
-              {
-                task: cmd.task,
-                planner,
-                approvals,
-                requireWriteApproval: cmd.requireWriteApproval,
-              },
-              send,
-            )
-            .finally(() => {
-              running = false
-            })
-        } else if (cmd.type === 'approve') {
-          approvals.resolve(cmd.id, true)
-        } else if (cmd.type === 'reject') {
-          approvals.resolve(cmd.id, false)
+        if (cmd.type === 'cancel') {
+          abort?.abort()
+          approvals.rejectAll()
+          return
         }
+        if (cmd.type === 'approve') {
+          approvals.resolve(cmd.id, true)
+          return
+        }
+        if (cmd.type === 'reject') {
+          approvals.resolve(cmd.id, false)
+          return
+        }
+        if (cmd.type !== 'task') return
+
+        if (typeof cmd.task !== 'string' || cmd.task.trim() === '') {
+          send({ type: 'error', message: 'task must be a non-empty string' })
+          send({ type: 'done', ok: false })
+          return
+        }
+        if (running) {
+          send({ type: 'error', message: 'a task is already running' })
+          send({ type: 'done', ok: false })
+          return
+        }
+
+        const model = cmd.deep
+          ? resolveDeepModel(env, { fusionAvailable: secrets.openrouter })
+          : modelRouting(env).frontier
+        const estUsd = costForTokens(model, cmd.deep ? DEEP_EST_TOKENS : FRONTIER_EST_TOKENS)
+
+        // Gated deep reasoning is capped per request.
+        if (cmd.deep && estUsd > DEEP_REQUEST_CAP_USD) {
+          send({ type: 'error', message: 'Deep reasoning exceeds the per-request cap.' })
+          send({ type: 'done', ok: false })
+          return
+        }
+        // Enforce the per-user spend cap BEFORE the model call.
+        const check = ledger.check(userId, estUsd, caps)
+        if (!check.allowed) {
+          send({ type: 'error', message: `Spend cap reached: ${check.reason}.` })
+          send({ type: 'done', ok: false })
+          return
+        }
+        ledger.record(userId, estUsd)
+        running = true
+        abort = new AbortController()
+        activeSessionId = sessionStore.createSession(ws.id, cmd.task).id
+        logger.info('agent run', {
+          workspace: ws.id,
+          session: activeSessionId,
+          model,
+          deep: Boolean(cmd.deep),
+          estUsd,
+        })
+
+        const planner = createPlanner(env, createLlmClient(env))
+        void agent
+          .run(
+            {
+              task: cmd.task,
+              planner,
+              approvals,
+              requireWriteApproval: cmd.requireWriteApproval,
+              signal: abort.signal,
+            },
+            send,
+          )
+          .finally(() => {
+            running = false
+          })
       })
     })
   }

@@ -32,6 +32,8 @@ export interface AgentRunOptions {
   approvals: ApprovalGate
   /** When true, every file write pauses for approval before being applied. */
   requireWriteApproval?: boolean
+  /** Aborts the run between actions (e.g. the client disconnected or hit Stop). */
+  signal?: AbortSignal
 }
 
 export type Emit = (event: AgentEvent) => void
@@ -55,6 +57,11 @@ export class Agent {
       let ok = true
 
       for (const action of actions) {
+        if (opts.signal?.aborted) {
+          emit({ type: 'message', text: 'Run cancelled.' })
+          ok = false
+          break
+        }
         switch (action.kind) {
           case 'message':
             emit({ type: 'message', text: action.text, agent: action.agent })

@@ -30,4 +30,13 @@ describe('createToolSet', () => {
     expect((await tools.terminal.exec('echo hi')).stdout).toBe('hi\n')
     expect(await provider.readFile(sandbox.id, 'a.txt')).toBe('hello')
   })
+
+  it('rejects agent path traversal (cannot escape the workspace)', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+
+    expect(() => tools.fs.write('../../etc/passwd', 'x')).toThrow(/unsafe path/)
+    expect(() => tools.fs.read('../secret')).toThrow(/unsafe path/)
+  })
 })
