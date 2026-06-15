@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# test + tooling output
+coverage/
+playwright-report/
+test-results/
+.vitest/
+
+# env + secrets (never commit real values)
+.env
+.env.local
+.env.*.local
+
+# misc
+*.log
+.DS_Store
+.turbo/
+.vercel/
+next-env.d.ts

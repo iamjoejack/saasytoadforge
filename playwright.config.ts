@@ -1,0 +1,19 @@
+import { defineConfig, devices } from '@playwright/test'
+
+/**
+ * End-to-end flows live in ./e2e and are added from Phase 1 onward (IDE round-trip,
+ * agent loop, artifact bundle). Run with `pnpm test:e2e` after `pnpm --filter @forge/web build`.
+ * Browsers are installed on demand via `pnpm exec playwright install` (deferred in Phase 0).
+ */
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  reporter: 'list',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+  },
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+})
