@@ -36,7 +36,12 @@ export const serverEnvSchema = z.object({
 export type ServerEnv = z.infer<typeof serverEnvSchema>
 
 export function parseServerEnv(raw: NodeJS.ProcessEnv = process.env): ServerEnv {
-  return serverEnvSchema.parse(raw)
+  // Treat empty-string env vars (common in .env files) as unset so optional fields work.
+  const cleaned: Record<string, string | undefined> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    cleaned[key] = value === '' ? undefined : value
+  }
+  return serverEnvSchema.parse(cleaned)
 }
 
 export interface SecretStatus {
