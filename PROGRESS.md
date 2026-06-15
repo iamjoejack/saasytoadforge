@@ -1,6 +1,6 @@
 # Forge Build Progress
 
-CURRENT TASK: Phase 4 COMPLETE on mocks (gate verified). NEXT: Phase 5 - Supabase auth + RLS, workspace/session/artifact persistence, Stripe scaffold, README, Vercel + Railway/Fly deploy configs, prod smoke test. STOPS for human approval before paid/prod deploy + live Stripe (needs SUPABASE_* + STRIPE_*).
+CURRENT TASK: Gap audit done (GAPS.md). Critical security fix landed: agent-service auth + per-user workspace ownership (closes cross-tenant access), CORS pin, WS auth, per-user spend cap, concurrent-task guard, approval cleanup, workspace delete, file-tree refresh, secure cookie. Real E2B + OpenRouter providers built (keys present; SANDBOX_PROVIDER still mock). 88 tests + 7 e2e green. NEXT (known gaps in GAPS.md): real E2B egress, Supabase/Stripe wiring, Fusion panel, rate limiting; then verify the real E2B+OpenRouter loop.
 
 Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 

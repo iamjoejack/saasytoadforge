@@ -27,7 +27,9 @@ export function TerminalPane({ workspaceId }: { workspaceId: string }) {
       term.open(containerRef.current)
       fit.fit()
 
-      const socket = new WebSocket(shellUrl(workspaceId))
+      const socketUrl = await shellUrl(workspaceId)
+      if (disposed) return
+      const socket = new WebSocket(socketUrl)
       socket.onmessage = (event) => {
         if (typeof event.data === 'string') term.write(event.data)
       }

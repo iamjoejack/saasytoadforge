@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useIde } from '@/lib/store'
 import { languageFor } from '@/lib/language'
 import { cn } from '@/lib/cn'
@@ -24,6 +24,13 @@ export function EditorPane() {
   const save = useIde((s) => s.save)
 
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  useEffect(() => {
+    const pending = timers.current
+    return () => {
+      for (const timer of Object.values(pending)) clearTimeout(timer)
+    }
+  }, [])
 
   function scheduleSave(path: string) {
     clearTimeout(timers.current[path])

@@ -1,19 +1,24 @@
 import { describe, it, expect } from 'vitest'
 import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
-import type { AgentEvent } from '@forge/shared'
+import { type AgentEvent, mintAgentToken, DEFAULT_AGENT_SERVICE_SECRET } from '@forge/shared'
 import { buildServer } from '../server'
 import { MockSandboxProvider } from '../sandbox'
 import { MockBrowserTool } from '../agent/tools'
+
+const TOKEN = mintAgentToken('alice', DEFAULT_AGENT_SERVICE_SECRET)
+const AUTH = { authorization: `Bearer ${TOKEN}` }
 
 describe('agent websocket', () => {
   it('runs the canonical task and streams plan, edits, terminal, done', async () => {
     const server = buildServer({ provider: new MockSandboxProvider(), browser: new MockBrowserTool() })
     await server.listen({ port: 0, host: '127.0.0.1' })
     const { port } = server.server.address() as AddressInfo
-    const id = (await server.inject({ method: 'POST', url: '/workspaces' })).json<{ id: string }>().id
+    const id = (
+      await server.inject({ method: 'POST', url: '/workspaces', headers: AUTH })
+    ).json<{ id: string }>().id
 
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/workspaces/${id}/agent`)
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/workspaces/${id}/agent?token=${TOKEN}`)
     const events: AgentEvent[] = []
 
     try {
@@ -48,7 +53,11 @@ describe('agent websocket', () => {
       expect(done.ok).toBe(true)
 
       // The session and its artifacts were persisted.
-      const sessionsRes = await server.inject({ method: 'GET', url: `/workspaces/${id}/sessions` })
+      const sessionsRes = await server.inject({
+        method: 'GET',
+        url: `/workspaces/${id}/sessions`,
+        headers: AUTH,
+      })
       const sessions = sessionsRes.json<Array<{ task: string; artifacts: Array<{ type: string }> }>>()
       expect(sessions).toHaveLength(1)
       const kinds = sessions[0]?.artifacts.map((a) => a.type) ?? []

@@ -1,6 +1,7 @@
 import Fastify, {
   type FastifyInstance,
   type FastifyReply,
+  type FastifyRequest,
   type FastifyPluginAsync,
 } from 'fastify'
 import cors from '@fastify/cors'
@@ -9,6 +10,7 @@ import {
   parseServerEnv,
   parseEgressAllowlist,
   secretStatus,
+  verifyAgentToken,
   type SandboxProvider,
   type ServerEnv,
   type AgentCommand,
@@ -28,35 +30,51 @@ import { logger } from './lib/logger'
 import { createBillingProvider } from './billing/billing'
 import { InMemorySessionStore } from './persistence/store'
 
+declare module 'fastify' {
+  interface FastifyRequest {
+    userId?: string
+  }
+}
+
 export interface ServerDeps {
   provider: SandboxProvider
   browser: BrowserTool
   ledger: SpendLedger
 }
 
-/**
- * Builds the agent-service app. A provider can be injected for deterministic tests;
- * otherwise it is resolved from env (mock unless real sandbox credentials are present).
- *
- * Routes live in a nested plugin registered AFTER @fastify/websocket so that the
- * plugin's onRoute hook is active when the `{ websocket: true }` routes are added.
- */
+const PUBLIC_PATHS = new Set(['/health', '/config', '/billing/plans'])
+
 export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
   const env = parseServerEnv()
   const provider = deps?.provider ?? createSandboxProvider(env)
-  // Mock browser (SVG preview) by default for the scaffold; PlaywrightBrowserTool is the
-  // real drop-in used against the running app on E2B.
   const browser = deps?.browser ?? new MockBrowserTool()
   const ledger = deps?.ledger ?? new SpendLedger()
   const egressAllowlist = parseEgressAllowlist(env)
   const workspaces = new WorkspaceManager(provider, egressAllowlist)
 
+  const allowedOrigins = env.ALLOWED_ORIGINS.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
   const app = Fastify({ logger: false })
-  void app.register(cors, { origin: true })
+  void app.register(cors, {
+    origin: allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:3000'],
+  })
   void app.register(websocket)
   void app.register(routes(provider, workspaces, env, browser, ledger))
 
   return app
+}
+
+/** userId for the request, guaranteed set by the auth hook for protected routes. */
+function userIdOf(req: FastifyRequest): string {
+  return req.userId ?? ''
+}
+
+/** userId from a websocket upgrade's ?token= query, or null. */
+function wsUserId(req: FastifyRequest, secret: string): string | null {
+  const token = (req.query as { token?: string }).token ?? ''
+  return token ? (verifyAgentToken(token, secret)?.userId ?? null) : null
 }
 
 function routes(
@@ -72,9 +90,24 @@ function routes(
   const sessionStore = new InMemorySessionStore()
 
   return async (app) => {
+    // Auth: every REST route except PUBLIC_PATHS requires a valid signed token.
+    // Websocket upgrades authenticate via ?token= in their own handlers.
+    app.addHook('onRequest', async (req, reply) => {
+      if (req.method === 'OPTIONS') return // CORS preflight
+      if ((req.headers.upgrade ?? '').toLowerCase() === 'websocket') return
+      const path = req.url.split('?')[0] ?? ''
+      if (PUBLIC_PATHS.has(path)) return
+      const header = req.headers.authorization ?? ''
+      const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+      const claims = token ? verifyAgentToken(token, env.AGENT_SERVICE_SECRET) : null
+      if (!claims) {
+        return reply.code(401).send({ error: 'unauthorized' })
+      }
+      req.userId = claims.userId
+    })
+
     app.get('/health', async () => ({ status: 'ok', service: 'agent-service' }))
 
-    // Non-secret configuration for the Settings screen (read-only display of policy).
     app.get('/config', async (): Promise<ConfigSummary> => ({
       models: modelRouting(env),
       sandboxProvider: env.SANDBOX_PROVIDER,
@@ -94,19 +127,26 @@ function routes(
       return billing.createCheckout(body.planId, { customerEmail: email })
     })
 
-    app.post('/workspaces', async () => workspaces.create())
+    app.post('/workspaces', async (req) => workspaces.create(userIdOf(req)))
 
-    app.get('/workspaces', async () => workspaces.list())
+    app.get('/workspaces', async (req) => workspaces.list(userIdOf(req)))
+
+    app.delete('/workspaces/:id', async (req, reply) => {
+      const id = (req.params as { id: string }).id
+      const ok = await workspaces.destroy(id, userIdOf(req))
+      if (!ok) return reply.code(404).send({ error: 'workspace not found' })
+      return { ok: true }
+    })
 
     app.get('/workspaces/:id/files', async (req, reply) => {
-      const ws = requireWorkspace(workspaces, req.params, reply)
+      const ws = requireWorkspace(workspaces, req, reply)
       if (!ws) return
       const dir = (req.query as { dir?: string }).dir ?? ''
       return provider.listFiles(ws.sandboxId, dir)
     })
 
     app.get('/workspaces/:id/file', async (req, reply) => {
-      const ws = requireWorkspace(workspaces, req.params, reply)
+      const ws = requireWorkspace(workspaces, req, reply)
       if (!ws) return
       const rawPath = (req.query as { path?: string }).path
       if (typeof rawPath !== 'string') {
@@ -123,7 +163,7 @@ function routes(
     })
 
     app.put('/workspaces/:id/file', async (req, reply) => {
-      const ws = requireWorkspace(workspaces, req.params, reply)
+      const ws = requireWorkspace(workspaces, req, reply)
       if (!ws) return
       const body = req.body as { path?: unknown; contents?: unknown }
       if (typeof body.path !== 'string' || typeof body.contents !== 'string') {
@@ -140,19 +180,19 @@ function routes(
     })
 
     app.get('/workspaces/:id/spend', async (req, reply) => {
-      const ws = requireWorkspace(workspaces, req.params, reply)
+      const ws = requireWorkspace(workspaces, req, reply)
       if (!ws) return
-      return ledger.summary(ws.id, caps)
+      return ledger.summary(userIdOf(req), caps)
     })
 
     app.get('/workspaces/:id/sessions', async (req, reply) => {
-      const ws = requireWorkspace(workspaces, req.params, reply)
+      const ws = requireWorkspace(workspaces, req, reply)
       if (!ws) return
       return sessionStore.listSessions(ws.id)
     })
 
     app.post('/workspaces/:id/exec', async (req, reply) => {
-      const ws = requireWorkspace(workspaces, req.params, reply)
+      const ws = requireWorkspace(workspaces, req, reply)
       if (!ws) return
       const body = req.body as { cmd?: unknown }
       if (typeof body.cmd !== 'string') {
@@ -163,21 +203,25 @@ function routes(
 
     // Streamed shell bridged to the editor terminal (xterm).
     app.get('/workspaces/:id/shell', { websocket: true }, (socket, req) => {
-      const ws = workspaces.get((req.params as { id: string }).id)
+      const userId = wsUserId(req, env.AGENT_SERVICE_SECRET)
+      if (!userId) {
+        socket.close(1008, 'unauthorized')
+        return
+      }
+      const ws = workspaces.get((req.params as { id: string }).id, userId)
       if (!ws) {
         socket.close(1008, 'workspace not found')
         return
       }
-      const shell = provider.openShell(ws.sandboxId)
-
-      // Attach the message handler synchronously before starting async work.
-      socket.on('message', (data: Buffer) => {
-        void shell.write(data.toString())
-      })
-      socket.on('close', () => {
-        void shell.close()
-      })
-
+      let shell
+      try {
+        shell = provider.openShell(ws.sandboxId)
+      } catch {
+        socket.close(1011, 'could not open shell')
+        return
+      }
+      socket.on('message', (data: Buffer) => void shell.write(data.toString()))
+      socket.on('close', () => void shell.close())
       void (async () => {
         for await (const chunk of shell.output) {
           if (socket.readyState === socket.OPEN) socket.send(chunk)
@@ -187,18 +231,29 @@ function routes(
 
     // Streamed agent loop: client sends AgentCommand, server streams AgentEvent.
     app.get('/workspaces/:id/agent', { websocket: true }, (socket, req) => {
-      const ws = workspaces.get((req.params as { id: string }).id)
+      const userId = wsUserId(req, env.AGENT_SERVICE_SECRET)
+      if (!userId) {
+        socket.close(1008, 'unauthorized')
+        return
+      }
+      const ws = workspaces.get((req.params as { id: string }).id, userId)
       if (!ws) {
         socket.close(1008, 'workspace not found')
         return
       }
+
       const approvals = new ApprovalGate()
       const agent = new Agent(createToolSet(provider, ws.sandboxId, browser))
       let activeSessionId: string | null = null
+      let running = false
+
       const send = (event: AgentEvent) => {
         if (activeSessionId) sessionStore.appendArtifact(activeSessionId, event)
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event))
       }
+
+      // Unblock the loop if the client disconnects mid-approval.
+      socket.on('close', () => approvals.rejectAll())
 
       socket.on('message', (data: Buffer) => {
         let cmd: AgentCommand
@@ -207,21 +262,27 @@ function routes(
         } catch {
           return
         }
+
         if (cmd.type === 'task') {
-          // Deep reasoning (Fusion) is gated + capped, and degrades to frontier if absent.
+          if (running) {
+            send({ type: 'error', message: 'a task is already running' })
+            send({ type: 'done', ok: false })
+            return
+          }
           const model = cmd.deep
             ? resolveDeepModel(env, { fusionAvailable: secrets.openrouter })
             : modelRouting(env).frontier
           const estUsd = costForTokens(model, cmd.deep ? 9000 : 2300)
 
-          // Enforce spend caps BEFORE the model call; degrade gracefully when hit.
-          const check = ledger.check(ws.id, estUsd, caps)
+          // Enforce the per-user spend cap BEFORE the model call.
+          const check = ledger.check(userId, estUsd, caps)
           if (!check.allowed) {
             send({ type: 'error', message: `Spend cap reached: ${check.reason}.` })
             send({ type: 'done', ok: false })
             return
           }
-          ledger.record(ws.id, estUsd)
+          ledger.record(userId, estUsd)
+          running = true
           activeSessionId = sessionStore.createSession(ws.id, cmd.task).id
           logger.info('agent run', {
             workspace: ws.id,
@@ -232,15 +293,19 @@ function routes(
           })
 
           const planner = createPlanner(env, createLlmClient(env))
-          void agent.run(
-            {
-              task: cmd.task,
-              planner,
-              approvals,
-              requireWriteApproval: cmd.requireWriteApproval,
-            },
-            send,
-          )
+          void agent
+            .run(
+              {
+                task: cmd.task,
+                planner,
+                approvals,
+                requireWriteApproval: cmd.requireWriteApproval,
+              },
+              send,
+            )
+            .finally(() => {
+              running = false
+            })
         } else if (cmd.type === 'approve') {
           approvals.resolve(cmd.id, true)
         } else if (cmd.type === 'reject') {
@@ -253,11 +318,11 @@ function routes(
 
 function requireWorkspace(
   workspaces: WorkspaceManager,
-  params: unknown,
+  req: FastifyRequest,
   reply: FastifyReply,
 ): Workspace | undefined {
-  const id = (params as { id?: string }).id ?? ''
-  const ws = workspaces.get(id)
+  const id = (req.params as { id?: string }).id ?? ''
+  const ws = workspaces.get(id, userIdOf(req))
   if (!ws) {
     void reply.code(404).send({ error: 'workspace not found' })
     return undefined

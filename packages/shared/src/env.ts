@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+/** Shared secret between the web app and agent-service for signed user tokens. */
+export const DEFAULT_AGENT_SERVICE_SECRET = 'forge-dev-insecure-secret-change-in-prod'
+
 /**
  * Server-side configuration. Secret values are OPTIONAL at boot so the app runs
  * with mock providers in development and never hard-blocks (see DECISIONS.md).
@@ -17,6 +20,11 @@ export const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+
+  // Shared secret for web <-> agent-service signed tokens.
+  AGENT_SERVICE_SECRET: z.string().default(DEFAULT_AGENT_SERVICE_SECRET),
+  /** Allowed browser origin(s) for CORS + websocket, comma-separated. Empty = localhost dev. */
+  ALLOWED_ORIGINS: z.string().default(''),
 
   // Sandbox + egress safety.
   SANDBOX_PROVIDER: z.enum(['mock', 'e2b', 'daytona']).default('mock'),

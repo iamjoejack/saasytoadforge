@@ -36,9 +36,11 @@ test('IDE round-trip: create workspace, open a file, run a shell command', async
   await page.locator('.monaco-editor').first().click()
   await page.keyboard.press('ControlOrMeta+End')
   await page.keyboard.type('\nedited by e2e')
+  const { token } = await (await page.request.get('/api/agent-token')).json()
   await expect(async () => {
     const res = await page.request.get(
       `${agentBase}/workspaces/${workspaceId}/file?path=README.md`,
+      { headers: { authorization: `Bearer ${token}` } },
     )
     const body = (await res.json()) as { contents: string }
     expect(body.contents).toContain('edited by e2e')

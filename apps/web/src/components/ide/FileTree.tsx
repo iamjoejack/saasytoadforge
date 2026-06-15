@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { FileEntry } from '@forge/shared'
 import * as client from '@/lib/forge-client'
 import { useIde } from '@/lib/store'
+import { useAgent } from '@/lib/agent-store'
 import { cn } from '@/lib/cn'
 
 function FileIcon({ type, open }: { type: 'file' | 'dir'; open: boolean }) {
@@ -71,6 +72,8 @@ function TreeNode({
 export function FileTree({ workspaceId }: { workspaceId: string }) {
   const [root, setRoot] = useState<FileEntry[] | null>(null)
   const [error, setError] = useState(false)
+  // Re-fetch the root listing whenever the agent edits a file.
+  const fileVersion = useAgent((s) => s.fileVersion)
 
   useEffect(() => {
     let active = true
@@ -81,7 +84,7 @@ export function FileTree({ workspaceId }: { workspaceId: string }) {
     return () => {
       active = false
     }
-  }, [workspaceId])
+  }, [workspaceId, fileVersion])
 
   return (
     <div className="flex h-full flex-col">

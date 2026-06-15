@@ -18,6 +18,12 @@ export class ApprovalGate {
     resolver(approved)
     return true
   }
+
+  /** Reject every pending approval (e.g. the client disconnected) so the loop unblocks. */
+  rejectAll(): void {
+    for (const resolver of this.pending.values()) resolver(false)
+    this.pending.clear()
+  }
 }
 
 export interface AgentRunOptions {

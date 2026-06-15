@@ -47,6 +47,11 @@ export default function WorkspacesPage() {
     }
   }
 
+  async function remove(id: string) {
+    setItems((current) => (current ?? []).filter((w) => w.id !== id))
+    await client.deleteWorkspace(id).catch(() => {})
+  }
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col px-6 py-16">
       <div className="mb-6 flex items-center justify-between text-xs text-zinc-500">
@@ -92,17 +97,28 @@ export default function WorkspacesPage() {
           </p>
         ) : (
           items.map((ws) => (
-            <Link
+            <div
               key={ws.id}
-              href={`/workspaces/${ws.id}`}
-              className="flex items-center gap-3 rounded-lg border border-white/10 px-4 py-3 transition hover:border-[var(--brass)]/40 hover:bg-white/5"
+              className="flex items-center gap-3 rounded-lg border border-white/10 px-4 py-3 transition hover:border-[var(--brass)]/40"
             >
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span className="font-mono text-sm text-zinc-200">{ws.id}</span>
+              <Link
+                href={`/workspaces/${ws.id}`}
+                className="font-mono text-sm text-zinc-200 transition hover:text-white"
+              >
+                {ws.id}
+              </Link>
               <span className="ml-auto text-xs text-zinc-600">
                 {new Date(ws.createdAt).toLocaleString()}
               </span>
-            </Link>
+              <button
+                type="button"
+                onClick={() => void remove(ws.id)}
+                className="text-xs text-zinc-500 transition hover:text-red-400"
+              >
+                delete
+              </button>
+            </div>
           ))
         )}
       </div>

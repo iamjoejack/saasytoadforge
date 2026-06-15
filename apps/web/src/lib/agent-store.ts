@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { AgentEvent, AgentCommand, AgentRole, PlanStep, TerminalResult } from '@forge/shared'
-import { agentUrl } from './forge-client'
 import * as client from './forge-client'
 
 export type TimelineItem =
@@ -37,6 +36,8 @@ interface AgentStore {
   requireWriteApproval: boolean
   deep: boolean
   spendUsd: number | null
+  /** Bumps whenever the agent edits a file, so the file tree can refresh. */
+  fileVersion: number
   timeline: TimelineItem[]
   socket: WebSocket | null
 
@@ -61,26 +62,42 @@ export const useAgent = create<AgentStore>()((set, get) => ({
   requireWriteApproval: false,
   deep: false,
   spendUsd: null,
+  fileVersion: 0,
   timeline: [],
   socket: null,
 
   connect: (workspaceId) => {
     get().socket?.close()
-    const socket = new WebSocket(agentUrl(workspaceId))
-    socket.onopen = () => set({ connected: true })
-    socket.onclose = () => set({ connected: false, running: false })
-    socket.onmessage = (event) => {
-      if (typeof event.data !== 'string') return
-      const parsed = JSON.parse(event.data) as AgentEvent
-      applyEvent(set, parsed)
-      if (parsed.type === 'done') {
-        void client
-          .getSpend(workspaceId)
-          .then((s) => set({ spendUsd: s.userUsd }))
-          .catch(() => {})
-      }
-    }
-    set({ socket, workspaceId, timeline: [], spendUsd: null })
+    set({ socket: null, workspaceId, timeline: [], spendUsd: null, connected: false })
+
+    // The agent websocket URL needs a signed token, so connecting is async.
+    void client
+      .agentUrl(workspaceId)
+      .then((url) => {
+        if (get().workspaceId !== workspaceId) return
+        const socket = new WebSocket(url)
+        socket.onopen = () => set({ connected: true })
+        socket.onclose = () => set({ connected: false, running: false })
+        socket.onerror = () => set({ connected: false })
+        socket.onmessage = (event) => {
+          if (typeof event.data !== 'string') return
+          let parsed: AgentEvent
+          try {
+            parsed = JSON.parse(event.data) as AgentEvent
+          } catch {
+            return
+          }
+          applyEvent(set, parsed)
+          if (parsed.type === 'done') {
+            void client
+              .getSpend(workspaceId)
+              .then((s) => set({ spendUsd: s.userUsd }))
+              .catch(() => {})
+          }
+        }
+        set({ socket })
+      })
+      .catch(() => {})
 
     // Rehydrate prior runs so history survives a reload.
     void client
@@ -178,6 +195,7 @@ function applyEvent(set: SetState, event: AgentEvent) {
       break
     case 'edit':
       set((s) => ({
+        fileVersion: s.fileVersion + 1,
         timeline: [
           ...s.timeline,
           {

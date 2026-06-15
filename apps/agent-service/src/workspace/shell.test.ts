@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
+import { mintAgentToken, DEFAULT_AGENT_SERVICE_SECRET } from '@forge/shared'
 import { buildServer } from '../server'
 import { MockSandboxProvider } from '../sandbox'
+
+const TOKEN = mintAgentToken('alice', DEFAULT_AGENT_SERVICE_SECRET)
 
 describe('shell websocket', () => {
   it('streams the prompt and command output back to the client', async () => {
@@ -10,10 +13,14 @@ describe('shell websocket', () => {
     await server.listen({ port: 0, host: '127.0.0.1' })
     const { port } = server.server.address() as AddressInfo
 
-    const create = await server.inject({ method: 'POST', url: '/workspaces' })
+    const create = await server.inject({
+      method: 'POST',
+      url: '/workspaces',
+      headers: { authorization: `Bearer ${TOKEN}` },
+    })
     const id = create.json<{ id: string }>().id
 
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/workspaces/${id}/shell`)
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/workspaces/${id}/shell?token=${TOKEN}`)
     const chunks: string[] = []
 
     try {

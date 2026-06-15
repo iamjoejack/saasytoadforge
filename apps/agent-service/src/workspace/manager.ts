@@ -3,6 +3,7 @@ import type { SandboxProvider } from '@forge/shared'
 export interface Workspace {
   id: string
   sandboxId: string
+  owner: string
   createdAt: string
 }
 
@@ -26,7 +27,7 @@ export class WorkspaceManager {
     private readonly egressAllowlist: string[] = [],
   ) {}
 
-  async create(): Promise<Workspace> {
+  async create(owner: string): Promise<Workspace> {
     const sandbox = await this.provider.create({
       template: 'node',
       envAllowlist: [],
@@ -39,22 +40,25 @@ export class WorkspaceManager {
     const workspace: Workspace = {
       id: sandbox.id,
       sandboxId: sandbox.id,
+      owner,
       createdAt: sandbox.createdAt,
     }
     this.workspaces.set(workspace.id, workspace)
     return workspace
   }
 
-  get(id: string): Workspace | undefined {
-    return this.workspaces.get(id)
+  /** Returns the workspace only if it is owned by `owner` (tenant isolation). */
+  get(id: string, owner: string): Workspace | undefined {
+    const ws = this.workspaces.get(id)
+    return ws && ws.owner === owner ? ws : undefined
   }
 
-  list(): Workspace[] {
-    return [...this.workspaces.values()]
+  list(owner: string): Workspace[] {
+    return [...this.workspaces.values()].filter((w) => w.owner === owner)
   }
 
-  async destroy(id: string): Promise<boolean> {
-    const workspace = this.workspaces.get(id)
+  async destroy(id: string, owner: string): Promise<boolean> {
+    const workspace = this.get(id, owner)
     if (!workspace) return false
     await this.provider.destroy(workspace.sandboxId)
     this.workspaces.delete(id)

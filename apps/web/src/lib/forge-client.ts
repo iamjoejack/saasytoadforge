@@ -10,6 +10,7 @@ import type {
 export interface Workspace {
   id: string
   sandboxId: string
+  owner: string
   createdAt: string
 }
 
@@ -24,12 +25,17 @@ export function toWsUrl(base: string, workspaceId: string, channel: 'shell' | 'a
   return `${base.replace(/^http/, 'ws')}/workspaces/${workspaceId}/${channel}`
 }
 
-export function shellUrl(workspaceId: string): string {
-  return toWsUrl(BASE, workspaceId, 'shell')
-}
+// ---- Auth: fetch a signed token from the web app, attach it to agent-service calls ----
 
-export function agentUrl(workspaceId: string): string {
-  return toWsUrl(BASE, workspaceId, 'agent')
+let cachedToken: string | null = null
+
+export async function agentToken(): Promise<string> {
+  if (cachedToken) return cachedToken
+  const res = await fetch('/api/agent-token')
+  if (!res.ok) throw new Error('forge-client: not authenticated')
+  const { token } = (await res.json()) as { token: string }
+  cachedToken = token
+  return token
 }
 
 async function asJson<T>(res: Response): Promise<T> {
@@ -37,57 +43,81 @@ async function asJson<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/** Authenticated agent-service call: attaches the bearer token, refreshes once on 401. */
+async function authed<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  headers.set('authorization', `Bearer ${await agentToken()}`)
+  let res = await fetch(`${BASE}${path}`, { ...init, headers })
+  if (res.status === 401) {
+    cachedToken = null
+    headers.set('authorization', `Bearer ${await agentToken()}`)
+    res = await fetch(`${BASE}${path}`, { ...init, headers })
+  }
+  return asJson<T>(res)
+}
+
+export async function shellUrl(workspaceId: string): Promise<string> {
+  return `${toWsUrl(BASE, workspaceId, 'shell')}?token=${encodeURIComponent(await agentToken())}`
+}
+
+export async function agentUrl(workspaceId: string): Promise<string> {
+  return `${toWsUrl(BASE, workspaceId, 'agent')}?token=${encodeURIComponent(await agentToken())}`
+}
+
+const JSON_HEADERS = { 'content-type': 'application/json' }
+
 export async function createWorkspace(): Promise<Workspace> {
-  return asJson(await fetch(`${BASE}/workspaces`, { method: 'POST' }))
+  return authed('/workspaces', { method: 'POST' })
 }
 
 export async function listWorkspaces(): Promise<Workspace[]> {
-  return asJson(await fetch(`${BASE}/workspaces`))
+  return authed('/workspaces')
+}
+
+export async function deleteWorkspace(id: string): Promise<void> {
+  await authed(`/workspaces/${id}`, { method: 'DELETE' })
 }
 
 export async function listFiles(id: string, dir = ''): Promise<FileEntry[]> {
-  return asJson(await fetch(`${BASE}/workspaces/${id}/files?dir=${encodeURIComponent(dir)}`))
+  return authed(`/workspaces/${id}/files?dir=${encodeURIComponent(dir)}`)
 }
 
 export async function readFile(id: string, path: string): Promise<string> {
-  const { contents } = await asJson<{ contents: string }>(
-    await fetch(`${BASE}/workspaces/${id}/file?path=${encodeURIComponent(path)}`),
+  const { contents } = await authed<{ contents: string }>(
+    `/workspaces/${id}/file?path=${encodeURIComponent(path)}`,
   )
   return contents
 }
 
 export async function writeFile(id: string, path: string, contents: string): Promise<void> {
-  await asJson(
-    await fetch(`${BASE}/workspaces/${id}/file`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ path, contents }),
-    }),
-  )
+  await authed(`/workspaces/${id}/file`, {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ path, contents }),
+  })
 }
 
 export async function exec(id: string, cmd: string): Promise<ExecResult> {
-  return asJson(
-    await fetch(`${BASE}/workspaces/${id}/exec`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cmd }),
-    }),
-  )
+  return authed(`/workspaces/${id}/exec`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ cmd }),
+  })
 }
 
+export async function getSpend(id: string): Promise<SpendSummaryDto> {
+  return authed(`/workspaces/${id}/spend`)
+}
+
+export async function getSessions(id: string): Promise<SessionDto[]> {
+  return authed(`/workspaces/${id}/sessions`)
+}
+
+// Public (no auth): policy + pricing display.
 export async function getConfig(): Promise<ConfigSummary> {
   return asJson(await fetch(`${BASE}/config`))
 }
 
-export async function getSpend(id: string): Promise<SpendSummaryDto> {
-  return asJson(await fetch(`${BASE}/workspaces/${id}/spend`))
-}
-
 export async function getPlans(): Promise<Plan[]> {
   return asJson(await fetch(`${BASE}/billing/plans`))
-}
-
-export async function getSessions(id: string): Promise<SessionDto[]> {
-  return asJson(await fetch(`${BASE}/workspaces/${id}/sessions`))
 }

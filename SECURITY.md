@@ -16,7 +16,10 @@ Agent- and user-generated code runs ONLY through `SandboxProvider`. The control 
 ## 6.2 Egress
 Default-deny per sandbox; allowlist = package registries + the user's declared domains.
 - `SandboxProvider.setEgressAllowlist` + `EGRESS_ALLOWLIST` env (`parseEgressAllowlist`).
-- Status: interface + config in place. Enforcement + a blocked-egress test land in Phase 4.
+- Status: **enforced only on the mock provider** (blocked-egress test). **On the real E2B
+  provider `setEgressAllowlist` is currently a no-op** - default-deny is NOT yet enforced for
+  real workloads; it needs an E2B template/firewall network policy. See GAPS.md. Do not treat
+  6.2 as satisfied in production.
 
 ## 6.3 Side-effect approvals
 Reads, plans, edits, and test runs proceed freely; irreversible side effects require explicit
@@ -50,3 +53,11 @@ Per-user and global caps enforced before each model call, backed by a Postgres l
   reviewed. PASS.
 - Phase 5 will move the spend ledger + workspace/artifact state to Postgres (Supabase) with
   row-level security, and add Stripe webhook signature verification.
+- **2026-06-15 security audit + fixes.** A review found the agent-service had no auth and no
+  workspace ownership (cross-tenant access by guessing an id) - the worst possible bug. Fixed:
+  signed per-user tokens, an auth hook + WS token check, `Workspace.owner` enforced on every
+  route (cross-tenant now 404s), CORS pinned, per-user spend cap, `secure` cookie, and several
+  correctness fixes (concurrent-task guard, approval cleanup, workspace delete). 6.1 / 6.3 / 6.5
+  strengthened. Remaining honest gaps (E2B egress no-op, spend pre-charge, Supabase/Stripe not
+  wired, Fusion config-only) are tracked in GAPS.md - the running service does NOT yet enforce
+  the full model the earlier "PASS" lines implied.
