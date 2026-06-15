@@ -51,7 +51,9 @@ export interface ServerDeps {
   ledger: SpendLedger
 }
 
-const PUBLIC_PATHS = new Set(['/health', '/config', '/billing/plans'])
+// /webhooks/stripe is public to the auth hook because Stripe sends no Bearer token;
+// it authenticates instead by verifying the Stripe signature against the raw body.
+const PUBLIC_PATHS = new Set(['/health', '/config', '/billing/plans', '/webhooks/stripe'])
 const WS_ROUTE = /\/workspaces\/[^/]+\/(shell|agent)$/
 
 /** Estimated tokens per agent run, feeding the spend-cap pre-charge. */
