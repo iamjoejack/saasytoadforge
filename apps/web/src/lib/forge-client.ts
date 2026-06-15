@@ -12,13 +12,17 @@ export function agentServiceBase(): string {
   return BASE
 }
 
-/** Derive the websocket shell URL from an http(s) base. Pure for testability. */
-export function toWsUrl(base: string, workspaceId: string): string {
-  return `${base.replace(/^http/, 'ws')}/workspaces/${workspaceId}/shell`
+/** Derive a websocket channel URL from an http(s) base. Pure for testability. */
+export function toWsUrl(base: string, workspaceId: string, channel: 'shell' | 'agent' = 'shell'): string {
+  return `${base.replace(/^http/, 'ws')}/workspaces/${workspaceId}/${channel}`
 }
 
 export function shellUrl(workspaceId: string): string {
-  return toWsUrl(BASE, workspaceId)
+  return toWsUrl(BASE, workspaceId, 'shell')
+}
+
+export function agentUrl(workspaceId: string): string {
+  return toWsUrl(BASE, workspaceId, 'agent')
 }
 
 async function asJson<T>(res: Response): Promise<T> {

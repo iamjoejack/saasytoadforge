@@ -1,6 +1,6 @@
 # Forge Build Progress
 
-CURRENT TASK: Phase 1 COMPLETE (gate green, e2e verified). NEXT: Phase 2 - single-agent plan/edit/run loop + chat + artifacts. (E2B real-sandbox swap still pending E2B_API_KEY; mock fallback in place.)
+CURRENT TASK: Phase 2 COMPLETE on mocks (gate verified via Playwright). NEXT: Phase 3 - subagents (orchestrator/coder/verifier/browser) + MCP tool surface + accept/reject diffs + screenshots. (Real agent/sandbox pending OPENROUTER_API_KEY + E2B_API_KEY; drop-in behind interfaces.)
 
 Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 
@@ -35,9 +35,10 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 - [x] agent websocket endpoint /workspaces/:id/agent (AgentCommand in, AgentEvent out)
 - [x] mock sandbox simulated test runner (node --test) - labeled simulation; real run needs E2B
 - [x] backend tests: diff, agent loop (+approval pause/reject), planner, llm, agent-WS (37 agent-service tests)
-- [ ] chat UI + artifact viewer (plan steps, diff, terminal) in the Agent panel
-- [ ] Playwright flow for the canonical task (on mock)
-- [ ] GATE: "add an endpoint returning current time + a test" -> plan, edits, green test, artifacts. (Verified on mock; real test execution pending E2B_API_KEY.)
+- [x] chat UI + artifact viewer (message bubbles, plan steps, diff, terminal) in the Agent panel (agent-store + artifacts.tsx)
+- [x] write-approval toggle in the UI + ApprovalCard (approve/reject)
+- [x] Playwright flows (on mock): agent loop artifacts + write-approval round-trip
+- [x] GATE: "add an endpoint returning current time + a test" -> plan, edits (diff artifacts), green test run (terminal artifact), all streamed to the Agent panel. Verified via Playwright + screenshots. (Execution simulated by mock; real run is a drop-in with E2B_API_KEY.)
 
 ## Phase 3 - Subagents + tools + artifacts UI
 - [ ] Orchestrator + Coder + Verifier + Browser subagents

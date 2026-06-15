@@ -52,7 +52,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
         </section>
 
         <aside className="min-h-0 border-l border-white/5">
-          <AgentPanel />
+          <AgentPanel workspaceId={workspaceId} />
         </aside>
       </div>
     </div>
