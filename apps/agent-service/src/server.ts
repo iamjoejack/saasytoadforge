@@ -18,7 +18,7 @@ import { assertSafePath, PathError } from './lib/paths'
 import { Agent, ApprovalGate } from './agent/agent'
 import { createLlmClient } from './agent/llm'
 import { createPlanner } from './agent/planner'
-import { createToolSet, PlaywrightBrowserTool, type BrowserTool } from './agent/tools'
+import { createToolSet, MockBrowserTool, type BrowserTool } from './agent/tools'
 
 export interface ServerDeps {
   provider: SandboxProvider
@@ -35,7 +35,9 @@ export interface ServerDeps {
 export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
   const env = parseServerEnv()
   const provider = deps?.provider ?? createSandboxProvider(env)
-  const browser = deps?.browser ?? new PlaywrightBrowserTool()
+  // Mock browser (SVG preview) by default for the scaffold; PlaywrightBrowserTool is the
+  // real drop-in used against the running app on E2B.
+  const browser = deps?.browser ?? new MockBrowserTool()
   const workspaces = new WorkspaceManager(provider)
 
   const app = Fastify({ logger: false })

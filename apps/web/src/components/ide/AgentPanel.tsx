@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useAgent } from '@/lib/agent-store'
 import { Toad } from '@/components/Toad'
 import { cn } from '@/lib/cn'
-import { MessageBubble, PlanView, DiffView, TerminalView, ApprovalCard } from './artifacts'
+import {
+  MessageBubble,
+  PlanView,
+  DiffView,
+  TerminalView,
+  ScreenshotView,
+  ApprovalCard,
+} from './artifacts'
 
 export function AgentPanel({ workspaceId }: { workspaceId: string }) {
   const connect = useAgent((s) => s.connect)
@@ -16,6 +23,8 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
   const setRequireWriteApproval = useAgent((s) => s.setRequireWriteApproval)
   const runTask = useAgent((s) => s.runTask)
   const respond = useAgent((s) => s.respond)
+  const acceptEdit = useAgent((s) => s.acceptEdit)
+  const rejectEdit = useAgent((s) => s.rejectEdit)
 
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -65,13 +74,34 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
           timeline.map((item) => {
             switch (item.kind) {
               case 'message':
-                return <MessageBubble key={item.id} role={item.role} text={item.text} />
+                return (
+                  <MessageBubble key={item.id} role={item.role} text={item.text} agent={item.agent} />
+                )
               case 'plan':
                 return <PlanView key={item.id} steps={item.steps} />
               case 'edit':
-                return <DiffView key={item.id} path={item.path} diff={item.diff} />
+                return (
+                  <DiffView
+                    key={item.id}
+                    path={item.path}
+                    diff={item.diff}
+                    status={item.status}
+                    agent={item.agent}
+                    onAccept={() => acceptEdit(item.id)}
+                    onReject={() => rejectEdit(item.id)}
+                  />
+                )
               case 'terminal':
-                return <TerminalView key={item.id} result={item.result} />
+                return <TerminalView key={item.id} result={item.result} agent={item.agent} />
+              case 'screenshot':
+                return (
+                  <ScreenshotView
+                    key={item.id}
+                    label={item.label}
+                    image={item.image}
+                    agent={item.agent}
+                  />
+                )
               case 'approval':
                 return (
                   <ApprovalCard

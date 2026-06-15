@@ -1,6 +1,6 @@
 # Forge Build Progress
 
-CURRENT TASK: Phase 2 COMPLETE on mocks (gate verified via Playwright). NEXT: Phase 3 - subagents (orchestrator/coder/verifier/browser) + MCP tool surface + accept/reject diffs + screenshots. (Real agent/sandbox pending OPENROUTER_API_KEY + E2B_API_KEY; drop-in behind interfaces.)
+CURRENT TASK: Phase 3 COMPLETE on mocks (gate verified via Playwright; SECURITY.md review PASS). NEXT: Phase 4 - egress allowlist enforcement + test, spend ledger + caps + test, side-effect approval queue, token/$ dashboard, structured logging, Fusion-gated deep reasoning. (Real agent/sandbox pending OPENROUTER_API_KEY + E2B_API_KEY.)
 
 Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 
@@ -40,12 +40,12 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 - [x] Playwright flows (on mock): agent loop artifacts + write-approval round-trip
 - [x] GATE: "add an endpoint returning current time + a test" -> plan, edits (diff artifacts), green test run (terminal artifact), all streamed to the Agent panel. Verified via Playwright + screenshots. (Execution simulated by mock; real run is a drop-in with E2B_API_KEY.)
 
-## Phase 3 - Subagents + tools + artifacts UI
-- [ ] Orchestrator + Coder + Verifier + Browser subagents
-- [ ] MCP tool surface (filesystem / terminal / browser, scoped)
-- [ ] artifact viewer with accept/reject on diffs
-- [ ] Playwright screenshot capture for UI tasks
-- [ ] GATE: multi-file UI task -> decomposed -> artifact bundle (plan, multi-file diff, test output, screenshot) + Security-Review of 6.1-6.3
+## Phase 3 - Subagents + tools + artifacts UI  (scaffolded on mocks)
+- [x] Orchestrator + Coder + Verifier + Browser subagents (roles on plan steps + event attribution)
+- [x] scoped MCP-style ToolSet (filesystem + terminal bound to sandbox, browser) - mission section 10
+- [x] artifact viewer: subagent badges, screenshot view, accept/reject on diffs (reject reverts in sandbox)
+- [x] screenshot capture: PlaywrightBrowserTool (real PNG of produced HTML) + MockBrowserTool (SVG preview, default for scaffold)
+- [x] GATE: multi-file UI task -> orchestrator decomposes -> bundle (plan, multi-file diff, test output, screenshot). Verified via Playwright + screenshot. SECURITY.md review of 6.1-6.3 = PASS.
 
 ## Phase 4 - Safety, cost, observability
 - [ ] egress allowlist enforcement + test

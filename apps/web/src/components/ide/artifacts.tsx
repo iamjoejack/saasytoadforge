@@ -1,6 +1,6 @@
 'use client'
 
-import type { PlanStep, TerminalResult } from '@forge/shared'
+import type { AgentRole, PlanStep, TerminalResult } from '@forge/shared'
 import { cn } from '@/lib/cn'
 
 const STEP_ICON: Record<PlanStep['status'], string> = {
@@ -19,7 +19,31 @@ const STEP_COLOR: Record<PlanStep['status'], string> = {
   skipped: 'text-zinc-600',
 }
 
-export function MessageBubble({ role, text }: { role: 'user' | 'assistant'; text: string }) {
+const ROLE_COLOR: Record<AgentRole, string> = {
+  orchestrator: 'text-[var(--brass)] border-[var(--brass)]/40',
+  coder: 'text-sky-400 border-sky-400/40',
+  verifier: 'text-emerald-400 border-emerald-400/40',
+  browser: 'text-violet-400 border-violet-400/40',
+}
+
+export function RoleBadge({ role }: { role?: AgentRole }) {
+  if (!role) return null
+  return (
+    <span className={cn('rounded border px-1.5 py-0.5 text-[10px] font-medium', ROLE_COLOR[role])}>
+      {role}
+    </span>
+  )
+}
+
+export function MessageBubble({
+  role,
+  text,
+  agent,
+}: {
+  role: 'user' | 'assistant'
+  text: string
+  agent?: AgentRole
+}) {
   const isUser = role === 'user'
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
@@ -29,6 +53,11 @@ export function MessageBubble({ role, text }: { role: 'user' | 'assistant'; text
           isUser ? 'bg-[var(--brass)]/15 text-zinc-100' : 'bg-white/5 text-zinc-200',
         )}
       >
+        {agent ? (
+          <span className="mr-2 align-middle">
+            <RoleBadge role={agent} />
+          </span>
+        ) : null}
         {text}
       </div>
     </div>
@@ -41,13 +70,18 @@ export function PlanView({ steps }: { steps: PlanStep[] }) {
       <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Plan</div>
       <ol className="space-y-1.5">
         {steps.map((step) => (
-          <li key={step.id} className="flex items-start gap-2 text-[13px]">
+          <li key={step.id} className="flex items-center gap-2 text-[13px]">
             <span className={cn('w-4 shrink-0 text-center', STEP_COLOR[step.status])}>
               {STEP_ICON[step.status]}
             </span>
             <span className={step.status === 'done' ? 'text-zinc-300' : 'text-zinc-200'}>
               {step.title}
             </span>
+            {step.role ? (
+              <span className="ml-auto">
+                <RoleBadge role={step.role} />
+              </span>
+            ) : null}
           </li>
         ))}
       </ol>
@@ -55,13 +89,30 @@ export function PlanView({ steps }: { steps: PlanStep[] }) {
   )
 }
 
-export function DiffView({ path, diff }: { path: string; diff: string }) {
+export function DiffView({
+  path,
+  diff,
+  status,
+  agent,
+  onAccept,
+  onReject,
+}: {
+  path: string
+  diff: string
+  status: 'applied' | 'accepted' | 'rejected'
+  agent?: AgentRole
+  onAccept: () => void
+  onReject: () => void
+}) {
   return (
     <div className="overflow-hidden rounded-lg border border-white/10 bg-black/30">
-      <div className="border-b border-white/5 px-3 py-1.5 font-mono text-[11px] text-zinc-400">
-        {path}
+      <div className="flex items-center gap-2 border-b border-white/5 px-3 py-1.5">
+        <span className="font-mono text-[11px] text-zinc-400">{path}</span>
+        <span className="ml-auto">
+          <RoleBadge role={agent} />
+        </span>
       </div>
-      <pre className="overflow-x-auto p-3 font-mono text-[12px] leading-relaxed">
+      <pre className="max-h-64 overflow-auto p-3 font-mono text-[12px] leading-relaxed">
         {diff.split('\n').map((line, i) => {
           const tag = line[0]
           const color =
@@ -79,16 +130,46 @@ export function DiffView({ path, diff }: { path: string; diff: string }) {
           )
         })}
       </pre>
+      <div className="flex items-center gap-2 border-t border-white/5 px-3 py-1.5">
+        {status === 'applied' ? (
+          <>
+            <button
+              type="button"
+              onClick={onAccept}
+              className="rounded bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400 transition hover:bg-emerald-500/25"
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              onClick={onReject}
+              className="rounded border border-zinc-600 px-2 py-0.5 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-400"
+            >
+              Reject
+            </button>
+          </>
+        ) : (
+          <span
+            className={cn(
+              'text-[11px] font-medium',
+              status === 'accepted' ? 'text-emerald-400' : 'text-zinc-500',
+            )}
+          >
+            {status === 'accepted' ? 'Accepted' : 'Reverted'}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
 
-export function TerminalView({ result }: { result: TerminalResult }) {
+export function TerminalView({ result, agent }: { result: TerminalResult; agent?: AgentRole }) {
   const passed = result.exitCode === 0
   return (
     <div className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
       <div className="flex items-center gap-2 border-b border-white/5 px-3 py-1.5">
         <span className="font-mono text-[12px] text-zinc-300">$ {result.cmd}</span>
+        <RoleBadge role={agent} />
         <span
           className={cn(
             'ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium',
@@ -98,10 +179,33 @@ export function TerminalView({ result }: { result: TerminalResult }) {
           exit {result.exitCode}
         </span>
       </div>
-      <pre className="overflow-x-auto whitespace-pre-wrap p-3 font-mono text-[12px] leading-relaxed text-zinc-300">
+      <pre className="max-h-56 overflow-auto whitespace-pre-wrap p-3 font-mono text-[12px] leading-relaxed text-zinc-300">
         {result.stdout}
         {result.stderr ? <span className="text-red-400">{result.stderr}</span> : null}
       </pre>
+    </div>
+  )
+}
+
+export function ScreenshotView({
+  label,
+  image,
+  agent,
+}: {
+  label: string
+  image: string
+  agent?: AgentRole
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-white/10 bg-black/30">
+      <div className="flex items-center gap-2 border-b border-white/5 px-3 py-1.5">
+        <span className="text-[12px] text-zinc-300">{label}</span>
+        <span className="ml-auto">
+          <RoleBadge role={agent} />
+        </span>
+      </div>
+      {/* Agent-produced screenshot artifact (data URL). */}
+      <img src={image} alt={label} className="w-full" />
     </div>
   )
 }
