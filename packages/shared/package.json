@@ -9,6 +9,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./owners": {
+      "types": "./src/owners.ts",
+      "default": "./src/owners.ts"
     }
   },
   "scripts": {

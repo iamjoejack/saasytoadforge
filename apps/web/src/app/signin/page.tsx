@@ -2,7 +2,7 @@
 
 import { Suspense, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { OWNER_EMAILS, isOwnerEmailDefault } from '@forge/shared'
+import { OWNER_EMAILS, isOwnerEmailDefault } from '@forge/shared/owners'
 import { Toad } from '@/components/Toad'
 import { cn } from '@/lib/cn'
 
@@ -191,6 +191,9 @@ function SignInForm() {
           >
             {mode === 'signin' ? "Don't have an account? Create one" : 'Already have an account? Sign in'}
           </button>
+          <a href="/admin/login" className="text-[11px] text-zinc-600 hover:text-[var(--brass)] transition">
+            Owner or admin? Sign in to the back office
+          </a>
 
           {/* Quick owner account setup shortcut */}
           {!isOwner && mode === 'signup' && (
