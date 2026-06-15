@@ -113,6 +113,19 @@ export async function getSessions(id: string): Promise<SessionDto[]> {
   return authed(`/workspaces/${id}/sessions`)
 }
 
+export async function createCheckout(planId: string): Promise<{ url: string; mode: 'mock' | 'stripe' }> {
+  const res = await fetch('/api/billing/checkout', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ planId }),
+  })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? `Checkout failed with status ${res.status}`)
+  }
+  return res.json() as Promise<{ url: string; mode: 'mock' | 'stripe' }>
+}
+
 // Public (no auth): policy + pricing display.
 export async function getConfig(): Promise<ConfigSummary> {
   return asJson(await fetch(`${BASE}/config`))
@@ -121,3 +134,4 @@ export async function getConfig(): Promise<ConfigSummary> {
 export async function getPlans(): Promise<Plan[]> {
   return asJson(await fetch(`${BASE}/billing/plans`))
 }
+

@@ -8,7 +8,30 @@ import { cn } from '@/lib/cn'
 
 const Monaco = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
-  loading: () => <div className="p-4 text-sm text-zinc-500">Loading editor...</div>,
+  loading: () => (
+    <div className="flex h-full flex-col bg-[#0d0d0f] p-4 font-mono text-[13px] text-zinc-700 select-none animate-pulse">
+      <div className="flex gap-4 mb-2">
+        <span className="w-8 shrink-0 select-none text-right opacity-30">1</span>
+        <div className="h-4 w-[35%] rounded bg-white/5" />
+      </div>
+      <div className="flex gap-4 mb-2">
+        <span className="w-8 shrink-0 select-none text-right opacity-30">2</span>
+        <div className="h-4 w-[55%] rounded bg-white/5" />
+      </div>
+      <div className="flex gap-4 mb-2">
+        <span className="w-8 shrink-0 select-none text-right opacity-30">3</span>
+        <div className="h-4 w-[20%] rounded bg-white/5" />
+      </div>
+      <div className="flex gap-4 mb-2">
+        <span className="w-8 shrink-0 select-none text-right opacity-30">4</span>
+        <div className="h-4 w-[70%] rounded bg-white/5" />
+      </div>
+      <div className="flex gap-4 mb-2">
+        <span className="w-8 shrink-0 select-none text-right opacity-30">5</span>
+        <div className="h-4 w-[45%] rounded bg-white/5" />
+      </div>
+    </div>
+  ),
 })
 
 const SAVE_DEBOUNCE_MS = 600

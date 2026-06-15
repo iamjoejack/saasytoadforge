@@ -2,11 +2,15 @@
 
 :root {
   /* SaaSyToad Forge brand: industrial/steampunk on near-black. */
-  --background: #0a0a0b;
+  --background: #060608;
   --foreground: #ededed;
   --brass: #c8a24a;
+  --brass-glow: rgba(200, 162, 74, 0.15);
   --copper: #b56a3a;
+  --copper-glow: rgba(181, 106, 58, 0.15);
   --gunmetal: #2a2d31;
+  --card-border: rgba(255, 255, 255, 0.06);
+  --glass-bg: rgba(12, 12, 14, 0.65);
 }
 
 html,
@@ -16,7 +20,100 @@ body {
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(181, 106, 58, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(200, 162, 74, 0.05) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* Custom premium scrollbar for Apple-like styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(200, 162, 74, 0.08), 0 0 2px rgba(200, 162, 74, 0.03);
+    border-color: rgba(200, 162, 74, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(200, 162, 74, 0.2), 0 0 8px rgba(200, 162, 74, 0.08);
+    border-color: rgba(200, 162, 74, 0.5);
+  }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Custom premium classes */
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+}
+
+.glass-panel-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-panel-hover:hover {
+  border-color: rgba(200, 162, 74, 0.25);
+  background: rgba(18, 18, 22, 0.85);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6);
+  transform: translateY(-2px);
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #101012 25%, #1c1c20 50%, #101012 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+.glow-pro {
+  animation: glowPulse 4s infinite ease-in-out;
 }
