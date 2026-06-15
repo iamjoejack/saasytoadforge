@@ -52,6 +52,14 @@ export interface SpendSummaryDto {
   globalRemainingUsd: number
 }
 
+export interface SessionDto {
+  id: string
+  workspaceId: string
+  task: string
+  createdAt: string
+  artifacts: AgentEvent[]
+}
+
 export interface ModelRouting {
   /** inline edits, routine steps */
   fast: string

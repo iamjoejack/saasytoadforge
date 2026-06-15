@@ -1,4 +1,11 @@
-import type { FileEntry, ExecResult, ConfigSummary, SpendSummaryDto, Plan } from '@forge/shared'
+import type {
+  FileEntry,
+  ExecResult,
+  ConfigSummary,
+  SpendSummaryDto,
+  SessionDto,
+  Plan,
+} from '@forge/shared'
 
 export interface Workspace {
   id: string
@@ -79,4 +86,8 @@ export async function getSpend(id: string): Promise<SpendSummaryDto> {
 
 export async function getPlans(): Promise<Plan[]> {
   return asJson(await fetch(`${BASE}/billing/plans`))
+}
+
+export async function getSessions(id: string): Promise<SessionDto[]> {
+  return asJson(await fetch(`${BASE}/workspaces/${id}/sessions`))
 }

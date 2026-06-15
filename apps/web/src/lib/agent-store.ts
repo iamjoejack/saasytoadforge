@@ -81,6 +81,20 @@ export const useAgent = create<AgentStore>()((set, get) => ({
       }
     }
     set({ socket, workspaceId, timeline: [], spendUsd: null })
+
+    // Rehydrate prior runs so history survives a reload.
+    void client
+      .getSessions(workspaceId)
+      .then((sessions) => {
+        for (const session of sessions) {
+          for (const artifact of session.artifacts) applyEvent(set, artifact)
+        }
+      })
+      .catch(() => {})
+    void client
+      .getSpend(workspaceId)
+      .then((s) => set({ spendUsd: s.userUsd }))
+      .catch(() => {})
   },
 
   disconnect: () => {

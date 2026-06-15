@@ -36,4 +36,8 @@ test('agent loop: plan, edits, and a green test run as artifacts', async ({ page
   await expect(page.getByText('pass 1')).toBeVisible()
 
   await page.screenshot({ path: 'test-results/agent.png' })
+
+  // History survives a reload (persisted artifacts rehydrate from the session store).
+  await page.reload()
+  await expect(page.getByText('exit 0')).toBeVisible({ timeout: 15000 })
 })
