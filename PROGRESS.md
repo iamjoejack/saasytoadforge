@@ -1,6 +1,6 @@
 # Forge Build Progress
 
-CURRENT TASK: Phase 0 complete and committed. NEXT: Phase 1 - IDE shell + live sandbox.
+CURRENT TASK: Phase 1 in progress. Provider layer landed (mock). NEXT: IDE shell (tree | Monaco | xterm | agent panel) + agent-service file/shell API + integration test.
 
 Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 
@@ -21,7 +21,8 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 - [ ] Monaco editor with tabs + file CRUD
 - [ ] file tree
 - [ ] xterm terminal wired to SandboxProvider.openShell
-- [ ] E2B SandboxProvider impl behind the interface (+ mock provider)
+- [x] mock SandboxProvider (in-memory FS + streaming shell) + factory (apps/agent-service/src/sandbox) - 10 tests
+- [ ] E2B SandboxProvider impl behind the interface (HUMAN-INPUT: E2B_API_KEY; mock fallback wired)
 - [ ] debounced file sync (sandbox FS is source of truth)
 - [ ] GATE: open workspace -> sandbox boots -> edit persists -> shell command streams back (integration test)
 

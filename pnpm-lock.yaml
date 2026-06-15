@@ -38,6 +38,9 @@ importers:
 
   apps/agent-service:
     dependencies:
+      '@forge/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       fastify:
         specifier: ^5.2.0
         version: 5.8.5
