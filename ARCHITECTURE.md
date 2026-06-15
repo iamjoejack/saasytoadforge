@@ -64,5 +64,17 @@ Config-driven (env-overridable, never hardcoded in logic):
 - `pnpm test:e2e` (Playwright) from Phase 1.
 - CI: `.github/workflows/ci.yml` runs lint + test + build on push/PR.
 
+## Layers (built, verified on mocks)
+- **Auth** (`apps/web/src/lib/auth`): `AuthProvider` interface + `DevAuthProvider` (scrypt +
+  cookie sessions) + middleware gate. Supabase Auth is the drop-in.
+- **Agent runtime** (`apps/agent-service/src/agent`): `Planner` + `LlmClient` (mock +
+  streaming OpenRouter) + `Agent` loop + scoped `ToolSet` (fs/terminal/browser).
+- **Safety/cost** (`apps/agent-service/src/lib`): egress default-deny, spend ledger + caps,
+  secret-redacting logger.
+- **Billing** (`apps/agent-service/src/billing`): `BillingProvider` + flat `PLANS`. Stripe drop-in.
+- **Persistence**: in-memory today; Supabase schema + RLS in `supabase/migrations/0001_init.sql`.
+
 ## Status
-Phase 0 (foundation) in progress. See PROGRESS.md.
+Phases 0-4 complete and verified on mocks. Phase 5 scaffolded (auth flow works on the dev
+provider; deploy configs + schema + billing + smoke test in place). Stops before real
+SUPABASE_*/STRIPE_* wiring and the first prod deploy (mission section 2.4). See PROGRESS.md.
