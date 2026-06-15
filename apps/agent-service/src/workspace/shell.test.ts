@@ -19,10 +19,11 @@ describe('shell websocket', () => {
     try {
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('shell stream timeout')), 4000)
-        socket.on('open', () => socket.send('echo streamed\n'))
+        // xterm sends CR on Enter.
+        socket.on('open', () => socket.send('echo streamed\r'))
         socket.on('message', (data: Buffer) => {
           chunks.push(data.toString())
-          if (chunks.join('').includes('streamed\n')) {
+          if (chunks.join('').includes('streamed\r\nforge:/workspace$')) {
             clearTimeout(timer)
             resolve()
           }
@@ -32,7 +33,8 @@ describe('shell websocket', () => {
 
       const transcript = chunks.join('')
       expect(transcript).toContain('$') // prompt
-      expect(transcript).toContain('streamed\n') // command output
+      expect(transcript).toContain('streamed\r\n') // command output (CRLF for the terminal)
+      expect(transcript.split('forge:/workspace$').length).toBeGreaterThanOrEqual(2) // reprompt
     } finally {
       socket.close()
       await server.close()

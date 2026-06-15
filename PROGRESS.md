@@ -1,6 +1,6 @@
 # Forge Build Progress
 
-CURRENT TASK: Phase 1 in progress. Provider layer landed (mock). NEXT: IDE shell (tree | Monaco | xterm | agent panel) + agent-service file/shell API + integration test.
+CURRENT TASK: Phase 1 COMPLETE (gate green, e2e verified). NEXT: Phase 2 - single-agent plan/edit/run loop + chat + artifacts. (E2B real-sandbox swap still pending E2B_API_KEY; mock fallback in place.)
 
 Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 
@@ -17,14 +17,15 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 - [x] commit Phase 0
 
 ## Phase 1 - IDE shell + live sandbox
-- [ ] 3-pane IDE layout (file tree | Monaco | terminal | agent panel)
-- [ ] Monaco editor with tabs + file CRUD
-- [ ] file tree
-- [ ] xterm terminal wired to SandboxProvider.openShell
 - [x] mock SandboxProvider (in-memory FS + streaming shell) + factory (apps/agent-service/src/sandbox) - 10 tests
-- [ ] E2B SandboxProvider impl behind the interface (HUMAN-INPUT: E2B_API_KEY; mock fallback wired)
-- [ ] debounced file sync (sandbox FS is source of truth)
-- [ ] GATE: open workspace -> sandbox boots -> edit persists -> shell command streams back (integration test)
+- [x] agent-service workspace API: REST files/exec + WS shell + path-traversal guard - 13 tests
+- [x] 3-pane IDE layout (file tree | Monaco | terminal | agent panel) - IdeShell
+- [x] Monaco editor with tabs (lazy-loaded, vs-dark)
+- [x] file tree (lazy dir expansion)
+- [x] xterm terminal wired to /workspaces/:id/shell websocket
+- [x] debounced file sync (600ms; sandbox FS is source of truth)
+- [ ] E2B SandboxProvider impl behind the interface (HUMAN-INPUT: E2B_API_KEY; mock fallback wired) - deferred, not gating
+- [x] GATE: open workspace -> sandbox boots -> edit persists -> shell streams back. Proven: vitest API round-trip + WS shell + Playwright UI e2e (Monaco edit persists to sandbox, terminal command streams). Screenshot verified.
 
 ## Phase 2 - Single-agent loop
 - [ ] Agent-Runtime service (OpenRouter streaming)

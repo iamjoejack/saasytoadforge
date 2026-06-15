@@ -19,6 +19,11 @@ marked and mirrored with a `// HUMAN-INPUT NEEDED` comment in code.
 | 2026-06-14 | Playwright browsers NOT installed in Phase 0 | Heavy download; e2e flows start Phase 1 | `pnpm exec playwright install` deferred | No |
 | 2026-06-14 | Default model IDs are config defaults (OpenRouter) | Placeholders, env-overridable; not load-bearing until Phase 2 | fast/frontier/deep presets | Yes - confirm exact OpenRouter model slugs at Phase 2 |
 | 2026-06-14 | Secret values absent | Building with mock providers per the never-hard-block doctrine | mock SANDBOX_PROVIDER, no live keys | Yes - OPENROUTER_API_KEY, E2B_API_KEY, SUPABASE_*, STRIPE_* before live phases |
+| 2026-06-15 | Fastify ws routes nested in a plugin registered AFTER @fastify/websocket | The plugin's onRoute hook must be active before `{ websocket: true }` routes are added, else the upgrade 500s (handler runs as plain HTTP) | nested `app.register(routes(...))` | No |
+| 2026-06-15 | Mock shell emulates a PTY line discipline | xterm sends CR on Enter (not LF), needs local echo and CRLF output; bare-LF splitting never ran commands | echo + CR/LF (CRLF=one) + backspace | No |
+| 2026-06-15 | Monaco loads via the default CDN loader (@monaco-editor/react) | Avoids a monaco-editor webpack/turbopack bundling step; works in dev/prod with network | CDN loader | Yes - self-host monaco before an air-gapped deploy |
+| 2026-06-15 | Visual verification via Playwright headless (Bash), not the preview MCP | The session's preview MCP is bound to a different repo; Playwright is the mission-mandated mechanism anyway | `pnpm exec playwright test` + screenshot artifact | No |
+| 2026-06-15 | E2E not in the default CI job | Needs both servers + a browser download; runs as its own step (playwright webServer self-starts them) | separate from lint/test/build | No |
 
 ## Open human inputs (surface at each phase boundary)
 - OPENROUTER_API_KEY - needed for real agent calls (Phase 2). Mocked until then.

@@ -16,4 +16,20 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Both servers must be up. Locally this reuses any already running; in CI it
+  // starts them (web needs a prior `pnpm --filter @forge/web build`).
+  webServer: [
+    {
+      command: 'pnpm --filter @forge/agent-service start',
+      port: 8787,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+    {
+      command: 'pnpm --filter @forge/web start',
+      port: 3000,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
 })

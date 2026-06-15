@@ -61,7 +61,7 @@ describe('MockSandboxProvider', () => {
     expect(src.map((e) => `${e.type}:${e.name}`)).toEqual(['dir:lib', 'file:index.ts'])
   })
 
-  it('streams shell output: prompt, command result, next prompt', async () => {
+  it('echoes input, runs the line on Enter (CR), and reprompts', async () => {
     const { provider, sandbox } = await freshSandbox()
     const shell = provider.openShell(sandbox.id)
     const iterator = shell.output[Symbol.asyncIterator]()
@@ -69,13 +69,37 @@ describe('MockSandboxProvider', () => {
     const firstPrompt = await iterator.next()
     expect(firstPrompt.value).toContain('$')
 
-    await shell.write('echo streamed\n')
-    const output = await iterator.next()
-    expect(output.value).toBe('streamed\n')
+    // xterm sends CR on Enter. Read through to the reprompt.
+    await shell.write('echo streamed\r')
 
-    const nextPrompt = await iterator.next()
-    expect(nextPrompt.value).toContain('$')
+    let transcript = ''
+    for (let i = 0; i < 120 && !transcript.includes('streamed\r\nforge:/workspace$'); i++) {
+      const { value } = await iterator.next()
+      transcript += value ?? ''
+    }
 
+    // Input was echoed, the command ran (CRLF output line), and a new prompt followed.
+    expect(transcript).toContain('echo streamed') // echo of keystrokes
+    expect(transcript).toContain('streamed\r\n') // command output, CRLF for the terminal
+    expect(transcript.split('forge:/workspace$').length).toBeGreaterThanOrEqual(2)
+
+    await shell.close()
+  })
+
+  it('treats CRLF as a single Enter and runs the command once', async () => {
+    const { provider, sandbox } = await freshSandbox()
+    const shell = provider.openShell(sandbox.id)
+    const iterator = shell.output[Symbol.asyncIterator]()
+    await iterator.next() // initial prompt
+
+    await shell.write('pwd\r\n')
+    let transcript = ''
+    for (let i = 0; i < 120 && !transcript.includes('/workspace\r\n'); i++) {
+      const { value } = await iterator.next()
+      transcript += value ?? ''
+    }
+    expect(transcript).toContain('pwd') // echoed
+    expect(transcript).toContain('/workspace\r\n') // command ran (the trailing LF did not error)
     await shell.close()
   })
 

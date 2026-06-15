@@ -81,6 +81,11 @@ function runCommand(files: Map<string, string>, cmd: string): ExecResult {
   return { exitCode, stdout, stderr, durationMs: Math.round(performance.now() - start) }
 }
 
+/** Terminals expect CRLF line endings; convert bare/Windows newlines to CRLF. */
+function toCRLF(text: string): string {
+  return text.replace(/\r?\n/g, '\r\n')
+}
+
 /** Async stream that lets a producer push chunks to an `for await` consumer. */
 class Pushable<T> implements AsyncIterable<T> {
   private readonly queue: T[] = []
@@ -179,21 +184,48 @@ export class MockSandboxProvider implements SandboxProvider {
     const stream = new Pushable<string>()
     const prompt = 'forge:/workspace$ '
     stream.push(prompt)
-    let buffer = ''
+
+    let lineBuffer = ''
+    let lastWasCR = false
+
+    function runLine(): void {
+      stream.push('\r\n')
+      const result = runCommand(state.files, lineBuffer)
+      lineBuffer = ''
+      if (result.stdout) stream.push(toCRLF(result.stdout))
+      if (result.stderr) stream.push(toCRLF(result.stderr))
+      stream.push(prompt)
+    }
 
     return {
       output: stream,
+      // Behaves like a PTY line discipline: echoes input, treats CR/LF (and CRLF as
+      // one) as Enter, and handles backspace. The terminal (xterm) sends CR on Enter.
       async write(data: string): Promise<void> {
-        buffer += data
-        let nl = buffer.indexOf('\n')
-        while (nl !== -1) {
-          const line = buffer.slice(0, nl)
-          buffer = buffer.slice(nl + 1)
-          const result = runCommand(state.files, line)
-          if (result.stdout) stream.push(result.stdout)
-          if (result.stderr) stream.push(result.stderr)
-          stream.push(prompt)
-          nl = buffer.indexOf('\n')
+        for (const ch of data) {
+          if (ch === '\r') {
+            runLine()
+            lastWasCR = true
+            continue
+          }
+          if (ch === '\n') {
+            if (lastWasCR) {
+              lastWasCR = false
+              continue
+            }
+            runLine()
+            continue
+          }
+          lastWasCR = false
+          if (ch === '\u007f' || ch === '\b') {
+            if (lineBuffer.length > 0) {
+              lineBuffer = lineBuffer.slice(0, -1)
+              stream.push('\b \b')
+            }
+          } else {
+            lineBuffer += ch
+            stream.push(ch)
+          }
         }
       },
       async resize(): Promise<void> {},
