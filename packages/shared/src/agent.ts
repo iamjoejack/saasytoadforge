@@ -95,6 +95,40 @@ export interface SessionDto {
   artifacts: AgentEvent[]
 }
 
+/** One pre-deploy check Ronald ran. */
+export interface ReviewCheck {
+  name: string
+  status: 'pass' | 'fail' | 'warn' | 'skip'
+  detail: string
+}
+
+/** Ronald's pre-deploy verdict. The user can deploy anyway even when ready is false. */
+export interface ReviewVerdict {
+  ready: boolean
+  /** 0-100 readiness score. */
+  score: number
+  /** Plain-language summary in Ronald's voice. */
+  summary: string
+  checks: ReviewCheck[]
+  /** What must be fixed before this is launch ready. */
+  blockers: string[]
+  /** Nice-to-have improvements. */
+  recommendations: string[]
+}
+
+/** Result of a deploy attempt, including Ronald's review. */
+export interface DeployResult {
+  /** True only when a real deployment happened. */
+  deployed: boolean
+  /** True when the deploy was held back because the review was not ready and force was not set. */
+  blocked: boolean
+  /** True when running on the mock sandbox (no real hosting). */
+  simulated: boolean
+  verdict: ReviewVerdict
+  url?: string
+  logs?: string
+}
+
 export interface ModelRouting {
   /** inline edits, routine steps */
   fast: string

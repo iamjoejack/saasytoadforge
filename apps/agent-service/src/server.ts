@@ -18,12 +18,15 @@ import {
   type AgentCommand,
   type AgentEvent,
   type ConfigSummary,
+  type DeployResult,
 } from '@forge/shared'
 import { createSandboxProvider } from './sandbox'
 import { WorkspaceManager, type Workspace } from './workspace/manager'
 import { assertSafePath, PathError } from './lib/paths'
 import { Agent, ApprovalGate, QuestionGate } from './agent/agent'
-import { createLlmClient } from './agent/llm'
+import { createLlmClient, type LlmMessage } from './agent/llm'
+import { runAgentic } from './agent/agentic'
+import { reviewWorkspace } from './agent/ronald'
 import { createPlanner } from './agent/planner'
 import { createToolSet, MockBrowserTool, type BrowserTool } from './agent/tools'
 import { SpendLedger, costForTokens, type SpendCaps } from './lib/spend'
@@ -316,29 +319,69 @@ function routes(
       return provider.exec(ws.sandboxId, body.cmd)
     })
 
-    app.post('/workspaces/:id/deploy', async (req, reply) => {
+    // Ronald reviews the workspace and returns an honest, overridable verdict.
+    app.post('/workspaces/:id/review', async (req, reply) => {
       const ws = requireWorkspace(workspaces, req, reply)
       if (!ws) return
-      if (ws.sandboxId.startsWith('mock_')) {
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+      const llm = createLlmClient(env)
+      return reviewWorkspace(provider, ws.sandboxId, {
+        llm,
+        model: modelRouting(env).frontier,
+        simulated: ws.sandboxId.startsWith('mock_'),
+      })
+    })
+
+    // Deploy gated by Ronald's review. The user can force a deploy past a not-ready verdict.
+    app.post('/workspaces/:id/deploy', async (req, reply): Promise<DeployResult | undefined> => {
+      const ws = requireWorkspace(workspaces, req, reply)
+      if (!ws) return
+      const body = (req.body ?? {}) as { force?: unknown }
+      const force = body.force === true
+      const simulated = ws.sandboxId.startsWith('mock_')
+
+      const llm = createLlmClient(env)
+      const verdict = await reviewWorkspace(provider, ws.sandboxId, {
+        llm,
+        model: modelRouting(env).frontier,
+        simulated,
+      })
+
+      // Held back: review is not ready and the user did not force it.
+      if (!verdict.ready && !force) {
+        return { deployed: false, blocked: true, simulated, verdict }
+      }
+
+      // Mock sandbox has no real hosting. Be honest rather than faking a success.
+      if (simulated) {
         return {
-          ok: true,
-          url: `https://forge-deploy-${ws.id.slice(0, 12)}.vercel.app`,
-          logs: '✓ Bundling assets...\n✓ Running type checks...\n✓ Building static pages...\n✓ Uploading bundle to edge network...\n✓ Deploy success!'
+          deployed: false,
+          blocked: false,
+          simulated: true,
+          verdict,
+          logs:
+            'Mock sandbox: the review ran, but no real deployment was performed. ' +
+            'Connect a real sandbox (E2B) to build and host this workspace.',
         }
-      } else {
-        const buildRes = await provider.exec(ws.sandboxId, 'pnpm run build || npm run build')
-        if (buildRes.exitCode !== 0) {
-          return reply.code(400).send({
-            error: 'Build failed during deployment',
-            logs: buildRes.stderr || buildRes.stdout
-          })
-        }
+      }
+
+      // Real build + deploy.
+      const buildRes = await provider.exec(ws.sandboxId, 'pnpm run build || npm run build')
+      if (buildRes.exitCode !== 0) {
         return {
-          ok: true,
-          url: `https://3000-${ws.sandboxId}.e2b.dev`,
-          logs: buildRes.stdout + '\n✓ Build verification passed.\n✓ Deploy success!'
+          deployed: false,
+          blocked: false,
+          simulated: false,
+          verdict,
+          logs: buildRes.stderr || buildRes.stdout || `Build failed (exit ${buildRes.exitCode}).`,
         }
+      }
+      return {
+        deployed: true,
+        blocked: false,
+        simulated: false,
+        verdict,
+        url: `https://3000-${ws.sandboxId}.e2b.dev`,
+        logs: `${buildRes.stdout}\nBuild verified. Deployment is live.`,
       }
     })
 
@@ -390,7 +433,10 @@ function routes(
       const approvals = new ApprovalGate()
       const questions = new QuestionGate()
       const spendApprovals = new ApprovalGate()  // separate gate for spend confirmations
-      const agent = new Agent(createToolSet(provider, ws.sandboxId, browser))
+      const tools = createToolSet(provider, ws.sandboxId, browser)
+      const agent = new Agent(tools)
+      /** Rolling chat history for this connection, so the window behaves like a chat. */
+      const chatHistory: LlmMessage[] = []
       let activeSessionId: string | null = null
       let running = false
       let abort: AbortController | null = null
@@ -547,22 +593,44 @@ function routes(
         })
 
         const llmClient = createLlmClient(env, cmd.customKeys)
-        const planner = createPlanner(env, llmClient)
-        void agent
-          .run(
+        // The built-in /schedule and /grill-me flows are handled by Agent.run regardless
+        // of model. Every other task runs the real tool-use loop when a model is available,
+        // and the deterministic planner when running on mocks.
+        const isSpecial = cmd.task.startsWith('/schedule') || cmd.task.startsWith('/grill-me')
+        if (!isSpecial && llmClient.kind !== 'mock') {
+          void runAgentic(
             {
               task: cmd.task,
-              planner,
+              llm: llmClient,
+              model,
+              tools,
               approvals,
-              questions,
               requireWriteApproval: cmd.requireWriteApproval,
               signal: abort.signal,
+              history: chatHistory,
             },
             send,
-          )
-          .finally(() => {
+          ).finally(() => {
             running = false
           })
+        } else {
+          const planner = createPlanner(env, llmClient)
+          void agent
+            .run(
+              {
+                task: cmd.task,
+                planner,
+                approvals,
+                questions,
+                requireWriteApproval: cmd.requireWriteApproval,
+                signal: abort.signal,
+              },
+              send,
+            )
+            .finally(() => {
+              running = false
+            })
+        }
       })
     })
   }
