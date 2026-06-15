@@ -52,6 +52,8 @@ export type AgentCommand =
       /** Only used when modelTier = 'custom'. A raw OpenRouter model ID. */
       customModelId?: string
       customKeys?: { anthropic?: string; google?: string }
+      /** When true, the agent runs a short discovery interview before building (first turn only). */
+      interview?: boolean
     }
   | { type: 'approve'; id: string }
   | { type: 'reject'; id: string }

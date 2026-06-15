@@ -2,11 +2,12 @@
 
 import { Suspense, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { OWNER_EMAILS, isOwnerEmailDefault } from '@forge/shared'
 import { Toad } from '@/components/Toad'
 import { cn } from '@/lib/cn'
 
-/** The company owner email — pre-filled for convenience. */
-const OWNER_EMAIL = 'joejackson80@gmail.com'
+/** First owner email, pre-filled on the owner-setup shortcut for convenience. */
+const OWNER_EMAIL = OWNER_EMAILS[0] ?? ''
 
 function SignInForm() {
   const router = useRouter()
@@ -21,7 +22,7 @@ function SignInForm() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const isOwner = email.trim().toLowerCase() === OWNER_EMAIL
+  const isOwner = isOwnerEmailDefault(email)
 
   async function submit(e: FormEvent) {
     e.preventDefault()

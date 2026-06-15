@@ -1,7 +1,7 @@
 import type { AgentEvent } from '@forge/shared'
 import type { LlmClient, LlmMessage } from './llm'
 import type { ToolSet } from './tools'
-import type { ApprovalGate } from './agent'
+import type { ApprovalGate, QuestionGate } from './agent'
 import { unifiedDiff } from './diff'
 
 /**
@@ -14,25 +14,35 @@ import { unifiedDiff } from './diff'
  * for any backend (Anthropic, Google, OpenRouter) without provider-specific tool APIs.
  */
 
-const KNOWN_TOOLS = new Set(['read_file', 'write_file', 'list_dir', 'run', 'screenshot', 'finish'])
+const KNOWN_TOOLS = new Set([
+  'read_file',
+  'write_file',
+  'list_dir',
+  'run',
+  'screenshot',
+  'ask',
+  'finish',
+])
 
 const MAX_OBSERVATION_CHARS = 6000
 
 export const AGENTIC_SYSTEM_PROMPT = `You are Ronald, the SaaSyToad Forge coding agent, working inside an isolated sandbox workspace.
 
-You can use tools to inspect and change the workspace. To call a tool, reply with ONLY a single JSON object, nothing else:
+You can use tools to inspect and change the workspace, and to ask the user questions. To call a tool, reply with ONLY a single JSON object, nothing else:
 {"thought": "<one short sentence on why>", "tool": "<name>", "args": { ... }}
 
 Tools:
 - read_file   args: { "path": string }                      read a workspace file
 - list_dir    args: { "path": string }                      list a directory ("" for the root)
 - write_file  args: { "path": string, "contents": string }  create or overwrite a whole file
-- run         args: { "cmd": string }                        run a shell command (tests, build, grep, etc.)
+- run         args: { "cmd": string }                        run a shell command (tests, build, grep, install, etc.)
 - screenshot  args: { "path": string, "label": string }      render an HTML file and capture it
+- ask         args: { "question": string, "options"?: string[], "multiSelect"?: boolean }  ask the user; the answer comes back as the observation
 - finish      args: { "summary": string }                    end the task with a short summary
 
 Rules:
 - Work in small steps. Read or list before you edit. After editing code, run the relevant tests or build to verify.
+- Use the right integration for the job. When a task needs a database, payments, email, automation, or hosting, wire up the connector that is available in this workspace (listed below) rather than rolling your own.
 - Paths are workspace-relative. Never use "../" or absolute paths.
 - write_file replaces the entire file; include the full intended contents.
 - When the task is done, call finish with a brief plain-language summary.
@@ -40,12 +50,28 @@ Rules:
 
 Style: plain language, direct and human, sentence case, no emojis, no em or en dashes.`
 
+/** A one-line discovery brief prepended to the first build task when the interview is on. */
+export const DISCOVERY_DIRECTIVE =
+  'Before you build anything, use the ask tool to run a short discovery interview: ask 2 to 4 focused questions to pin down who this is for, the must-have features, any integrations or data sources needed, and the look and feel. Offer options where it helps. Once you have enough to proceed, build it.'
+
+function buildSystemPrompt(connectors: string[]): string {
+  const line =
+    connectors.length > 0
+      ? `\n\nConnectors available in this workspace: ${connectors.join(', ')}. Prefer these for the tasks they cover.`
+      : '\n\nNo external connectors are configured in this workspace yet. If a task needs one, ask the user to enable it in the extensions store.'
+  return AGENTIC_SYSTEM_PROMPT + line
+}
+
 export interface AgenticOptions {
   task: string
   llm: LlmClient
   model: string
   tools: ToolSet
   approvals: ApprovalGate
+  /** Gate for the ask tool, so the agent can interview the user. */
+  questions?: QuestionGate
+  /** Names of integrations available in this workspace, surfaced to the model. */
+  connectors?: string[]
   /** When true, every write pauses for explicit approval. */
   requireWriteApproval?: boolean
   /** Aborts the loop between steps. */
@@ -139,7 +165,7 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
   const { tools, approvals, signal } = opts
   const maxSteps = opts.maxSteps ?? 16
   const messages: LlmMessage[] = [
-    { role: 'system', content: AGENTIC_SYSTEM_PROMPT },
+    { role: 'system', content: buildSystemPrompt(opts.connectors ?? []) },
     ...opts.history,
     { role: 'user', content: opts.task },
   ]
@@ -190,7 +216,11 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
     usedTools = true
     let observation: string
     try {
-      observation = await runTool(call, tools, approvals, emit, opts.requireWriteApproval)
+      observation = await runTool(call, tools, approvals, emit, {
+        requireWriteApproval: opts.requireWriteApproval,
+        questions: opts.questions,
+        stepId: step,
+      })
     } catch (err) {
       observation = `error: ${err instanceof Error ? err.message : String(err)}`
     }
@@ -217,14 +247,40 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
   return { ok }
 }
 
+interface RunToolCtx {
+  requireWriteApproval?: boolean
+  questions?: QuestionGate
+  stepId: number
+}
+
 async function runTool(
   call: ToolCall,
   tools: ToolSet,
   approvals: ApprovalGate,
   emit: Emit,
-  requireWriteApproval?: boolean,
+  ctx: RunToolCtx,
 ): Promise<string> {
+  const { requireWriteApproval } = ctx
   switch (call.tool) {
+    case 'ask': {
+      const question = str(call.args.question)
+      if (!question) return 'error: ask needs a question'
+      if (!ctx.questions) return 'asking is not available in this run; proceed with your best assumption'
+      const rawOptions = Array.isArray(call.args.options) ? call.args.options : []
+      const options = rawOptions.map((o) => String(o)).filter(Boolean)
+      const id = `ask_${ctx.stepId}`
+      emit({
+        type: 'question',
+        id,
+        question,
+        options,
+        isMultiSelect: call.args.multiSelect === true,
+      })
+      const selection = await ctx.questions.request(id)
+      if (selection.length === 0) return 'the user did not answer; proceed with a sensible default'
+      return `the user answered: ${selection.join(', ')}`
+    }
+
     case 'read_file': {
       const path = str(call.args.path)
       if (!path) return 'error: read_file needs a path'

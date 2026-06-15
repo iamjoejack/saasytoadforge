@@ -69,6 +69,8 @@ interface AgentStore {
   /** Model tier: fast | frontier | fusion (default) | custom */
   modelTier: 'fast' | 'frontier' | 'fusion' | 'custom'
   customModelId: string
+  /** When true, the agent runs a short discovery interview before building. */
+  interviewEnabled: boolean
   spendUsd: number | null
   /** Bumps whenever the agent edits a file, so the file tree can refresh. */
   fileVersion: number
@@ -80,6 +82,7 @@ interface AgentStore {
   setRequireWriteApproval: (value: boolean) => void
   setModelTier: (tier: 'fast' | 'frontier' | 'fusion' | 'custom') => void
   setCustomModelId: (id: string) => void
+  setInterviewEnabled: (value: boolean) => void
   runTask: (task: string) => void
   cancelRun: () => void
   respond: (approvalId: string, approve: boolean) => void
@@ -101,6 +104,7 @@ export const useAgent = create<AgentStore>()((set, get) => ({
   requireWriteApproval: false,
   modelTier: readStoredTier(),
   customModelId: typeof window !== 'undefined' ? (localStorage.getItem('forge:custom_model_id') || '') : '',
+  interviewEnabled: typeof window !== 'undefined' ? localStorage.getItem('forge:interview') !== 'false' : true,
   spendUsd: null,
   fileVersion: 0,
   timeline: [],
@@ -188,9 +192,17 @@ export const useAgent = create<AgentStore>()((set, get) => ({
     }
     set({ customModelId: id })
   },
+  setInterviewEnabled: (value) => {
+    try {
+      localStorage.setItem('forge:interview', value ? 'true' : 'false')
+    } catch {
+      // ignore storage failures (private mode, quota)
+    }
+    set({ interviewEnabled: value })
+  },
 
   runTask: (task) => {
-    const { socket, requireWriteApproval, modelTier, customModelId } = get()
+    const { socket, requireWriteApproval, modelTier, customModelId, interviewEnabled } = get()
 
     // Load custom developer keys from secure local storage
     let customKeys: { anthropic?: string; google?: string } | undefined = undefined
@@ -218,6 +230,7 @@ export const useAgent = create<AgentStore>()((set, get) => ({
       modelTier,
       customModelId: modelTier === 'custom' ? customModelId : undefined,
       customKeys,
+      interview: interviewEnabled,
     })
   },
 

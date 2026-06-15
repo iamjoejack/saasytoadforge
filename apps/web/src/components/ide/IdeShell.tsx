@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { ReviewVerdict, ReviewCheck } from '@forge/shared'
 import { useIde } from '@/lib/store'
 import { Toad } from '@/components/Toad'
+import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/cn'
 import { FileTree } from './FileTree'
 import { EditorPane } from './EditorPane'
@@ -470,8 +471,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
     <div className="grid h-dvh grid-rows-[auto_1fr_auto] bg-[var(--background)] text-zinc-200">
       <header className="flex items-center gap-3 border-b border-white/5 px-4 py-1">
         <Link href="/" className="flex items-center gap-2 select-none shrink-0">
-          <Toad className="h-5 w-5" />
-          <span className="text-sm font-semibold tracking-tight text-white font-cinzel">Forge</span>
+          <Logo wordmark="Forge" markSize={20} />
         </Link>
         <span className="text-zinc-700 select-none">/</span>
         <Link href="/workspaces" className="text-xs text-zinc-400 transition hover:text-zinc-200 select-none shrink-0">

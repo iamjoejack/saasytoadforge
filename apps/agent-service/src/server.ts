@@ -25,7 +25,7 @@ import { WorkspaceManager, type Workspace } from './workspace/manager'
 import { assertSafePath, PathError } from './lib/paths'
 import { Agent, ApprovalGate, QuestionGate } from './agent/agent'
 import { createLlmClient, type LlmMessage } from './agent/llm'
-import { runAgentic } from './agent/agentic'
+import { runAgentic, DISCOVERY_DIRECTIVE } from './agent/agentic'
 import { reviewWorkspace } from './agent/ronald'
 import { createPlanner } from './agent/planner'
 import { createToolSet, MockBrowserTool, type BrowserTool } from './agent/tools'
@@ -137,6 +137,15 @@ function routes(
     approvalBlockUsd: 5,
   }
   const secrets = secretStatus(env)
+  // Live integrations the agent can wire up, surfaced to the model so it uses the right one.
+  const liveConnectors = [
+    secrets.supabase && 'Supabase (Postgres database and auth)',
+    secrets.stripe && 'Stripe (payments and billing)',
+    secrets.resend && 'Resend (transactional email)',
+    secrets.zapier && 'Zapier (automation and webhooks)',
+    secrets.vercel && 'Vercel (hosting and deploys)',
+    secrets.upstashRedis && 'Upstash Redis (cache and queues)',
+  ].filter((c): c is string => Boolean(c))
   const billing = createBillingProvider(env)
   const sessionStore = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
     ? new SupabaseSessionStore(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
@@ -600,13 +609,20 @@ function routes(
         // and the deterministic planner when running on mocks.
         const isSpecial = cmd.task.startsWith('/schedule') || cmd.task.startsWith('/grill-me')
         if (!isSpecial && llmClient.kind !== 'mock') {
+          // Discovery interview: only on the first turn of a fresh conversation.
+          const interviewing = cmd.interview === true && chatHistory.length === 0
+          const task = interviewing
+            ? `${DISCOVERY_DIRECTIVE}\n\nUser request: ${cmd.task}`
+            : cmd.task
           void runAgentic(
             {
-              task: cmd.task,
+              task,
               llm: llmClient,
               model,
               tools,
               approvals,
+              questions,
+              connectors: liveConnectors,
               requireWriteApproval: cmd.requireWriteApproval,
               signal: abort.signal,
               history: chatHistory,

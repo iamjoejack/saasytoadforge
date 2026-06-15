@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ConfigSummary } from '@forge/shared'
+import { isOwnerEmailDefault } from '@forge/shared'
 import * as client from '@/lib/forge-client'
 import { Toad } from '@/components/Toad'
 import { useAgent } from '@/lib/agent-store'
@@ -45,6 +46,8 @@ export default function SettingsPage() {
   const customModelId = useAgent((s) => s.customModelId)
   const setCustomModelId = useAgent((s) => s.setCustomModelId)
   const socket = useAgent((s) => s.socket)
+  const interviewEnabled = useAgent((s) => s.interviewEnabled)
+  const setInterviewEnabled = useAgent((s) => s.setInterviewEnabled)
 
   // Fetch session & config on mount
   useEffect(() => {
@@ -180,7 +183,7 @@ export default function SettingsPage() {
     }
   }
 
-  const isOwner = user?.email.toLowerCase() === 'joejackson80@gmail.com'
+  const isOwner = isOwnerEmailDefault(user?.email)
 
   const tabs = [
     { id: 'account', label: 'Account & plan' },
@@ -543,6 +546,34 @@ export default function SettingsPage() {
                         className={cn(
                           'pointer-events-none inline-block h-4 w-4 translate-y-[1px] rounded-full bg-white shadow-lg ring-0 transition-transform duration-200',
                           notificationsEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                        )}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Discovery interview toggle */}
+                <div className="space-y-3 pt-4 border-t border-white/5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-450">Discovery interview</label>
+                      <p className="text-[10px] text-zinc-550 leading-relaxed mt-0.5">
+                        When on, Ronald asks a few quick questions to understand what you want before building. Turn it off to start building right away.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInterviewEnabled(!interviewEnabled)}
+                      className={cn(
+                        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 focus:outline-none',
+                        interviewEnabled ? 'border-[var(--brass)] bg-[var(--brass)]/80' : 'border-zinc-700 bg-zinc-800'
+                      )}
+                      aria-pressed={interviewEnabled}
+                    >
+                      <span
+                        className={cn(
+                          'pointer-events-none inline-block h-4 w-4 translate-y-[1px] rounded-full bg-white shadow-lg ring-0 transition-transform duration-200',
+                          interviewEnabled ? 'translate-x-5' : 'translate-x-0.5'
                         )}
                       />
                     </button>

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { AgentEvent } from '@forge/shared'
 import { runAgentic, parseToolCall, type AgenticOptions } from './agentic'
-import { ApprovalGate } from './agent'
+import { ApprovalGate, QuestionGate } from './agent'
 import { createToolSet } from './tools'
 import { MockBrowserTool } from './tools'
 import { MockSandboxProvider } from '../sandbox/mock-provider'
@@ -95,6 +95,36 @@ describe('runAgentic', () => {
     expect(history.length).toBe(2)
     expect(history[0]).toEqual({ role: 'user', content: 'hi' })
     expect(history[1]?.role).toBe('assistant')
+  })
+
+  it('interviews via the ask tool and uses the answer', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const questions = new QuestionGate()
+    const events: AgentEvent[] = []
+
+    const opts: AgenticOptions = {
+      task: 'build me something',
+      llm: new ScriptedLlm([
+        '{"tool":"ask","args":{"question":"Who is this for?","options":["Solo","Team"]}}',
+        '{"tool":"finish","args":{"summary":"Got it, building for a team."}}',
+      ]),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals: new ApprovalGate(),
+      questions,
+      history: [],
+    }
+
+    await runAgentic(opts, (e) => {
+      events.push(e)
+      if (e.type === 'question') setTimeout(() => questions.resolve(e.id, ['Team']), 0)
+    })
+
+    const q = events.find((e) => e.type === 'question')
+    expect(q && q.type === 'question' && q.question).toBe('Who is this for?')
+    expect(events.at(-1)).toEqual({ type: 'done', ok: true })
   })
 
   it('respects write approval rejection', async () => {

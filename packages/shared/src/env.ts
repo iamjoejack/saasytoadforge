@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { OWNER_EMAILS as DEFAULT_OWNER_EMAILS } from './owners'
+
+const DEFAULT_OWNERS_CSV = DEFAULT_OWNER_EMAILS.join(',')
 
 /** Shared secret between the web app and agent-service for signed user tokens. */
 export const DEFAULT_AGENT_SERVICE_SECRET = 'forge-dev-insecure-secret-change-in-prod'
@@ -34,14 +37,14 @@ export const serverEnvSchema = z.object({
 
   // Shared secret for web <-> agent-service signed tokens.
   AGENT_SERVICE_SECRET: z.string().default(DEFAULT_AGENT_SERVICE_SECRET),
-  /** Comma-separated list of admin emails (access to /admin/stats). */
-  ADMIN_EMAILS: z.string().default('joejackson80@gmail.com'),
+  /** Comma-separated list of admin emails (access to /admin/stats). Owners are admins too. */
+  ADMIN_EMAILS: z.string().default(DEFAULT_OWNERS_CSV),
   /**
    * Comma-separated list of owner/founder emails.
-   * Owners bypass ALL spend caps and have unlimited agent access.
-   * Set this to the company account email(s).
+   * Owners bypass ALL spend caps, have unlimited agent access, and are the only
+   * accounts that can create or remove admin users. Defaults from the shared owners list.
    */
-  OWNER_EMAILS: z.string().default('joejackson80@gmail.com'),
+  OWNER_EMAILS: z.string().default(DEFAULT_OWNERS_CSV),
   /** Allowed browser origin(s) for CORS + websocket, comma-separated. Empty = localhost dev. */
   ALLOWED_ORIGINS: z.string().default(''),
 
