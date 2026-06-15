@@ -26,6 +26,7 @@ import { SpendLedger, costForTokens, type SpendCaps } from './lib/spend'
 import { modelRouting, resolveDeepModel } from './agent/router'
 import { logger } from './lib/logger'
 import { createBillingProvider } from './billing/billing'
+import { InMemorySessionStore } from './persistence/store'
 
 export interface ServerDeps {
   provider: SandboxProvider
@@ -68,6 +69,7 @@ function routes(
   const caps: SpendCaps = { perUserUsd: env.SPEND_CAP_USER_USD, globalUsd: env.SPEND_CAP_GLOBAL_USD }
   const secrets = secretStatus(env)
   const billing = createBillingProvider(env)
+  const sessionStore = new InMemorySessionStore()
 
   return async (app) => {
     app.get('/health', async () => ({ status: 'ok', service: 'agent-service' }))
@@ -143,6 +145,12 @@ function routes(
       return ledger.summary(ws.id, caps)
     })
 
+    app.get('/workspaces/:id/sessions', async (req, reply) => {
+      const ws = requireWorkspace(workspaces, req.params, reply)
+      if (!ws) return
+      return sessionStore.listSessions(ws.id)
+    })
+
     app.post('/workspaces/:id/exec', async (req, reply) => {
       const ws = requireWorkspace(workspaces, req.params, reply)
       if (!ws) return
@@ -186,7 +194,9 @@ function routes(
       }
       const approvals = new ApprovalGate()
       const agent = new Agent(createToolSet(provider, ws.sandboxId, browser))
+      let activeSessionId: string | null = null
       const send = (event: AgentEvent) => {
+        if (activeSessionId) sessionStore.appendArtifact(activeSessionId, event)
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event))
       }
 
@@ -212,8 +222,10 @@ function routes(
             return
           }
           ledger.record(ws.id, estUsd)
+          activeSessionId = sessionStore.createSession(ws.id, cmd.task).id
           logger.info('agent run', {
             workspace: ws.id,
+            session: activeSessionId,
             model,
             deep: Boolean(cmd.deep),
             estUsd,

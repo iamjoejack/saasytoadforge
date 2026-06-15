@@ -46,6 +46,14 @@ describe('agent websocket', () => {
       const done = events.at(-1)
       if (done?.type !== 'done') throw new Error('no done event')
       expect(done.ok).toBe(true)
+
+      // The session and its artifacts were persisted.
+      const sessionsRes = await server.inject({ method: 'GET', url: `/workspaces/${id}/sessions` })
+      const sessions = sessionsRes.json<Array<{ task: string; artifacts: Array<{ type: string }> }>>()
+      expect(sessions).toHaveLength(1)
+      const kinds = sessions[0]?.artifacts.map((a) => a.type) ?? []
+      expect(kinds).toContain('edit')
+      expect(kinds).toContain('terminal')
     } finally {
       socket.close()
       await server.close()

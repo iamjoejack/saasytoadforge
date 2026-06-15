@@ -58,7 +58,7 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 
 ## Phase 5 - Auth, persistence, billing, ship  (scaffold ready; STOP boundary per 2.4)
 - [x] Auth flow works (dev provider): AuthProvider interface + DevAuthProvider (scrypt + cookie sessions) + sign-in/up page + middleware gate + sign-out. Supabase Auth is the drop-in. Verified via Playwright. (Supabase RLS schema written; real wiring pending SUPABASE_*.)
-- [~] workspace/session/artifact persistence - schema ready; repository swap-in pending SUPABASE_* (currently in-memory + in-process spend ledger)
+- [x] session/artifact persistence (in-memory): InMemorySessionStore records each agent session + its artifacts; GET /workspaces/:id/sessions; verified. Supabase (schema + RLS ready) is the drop-in. Spend ledger in-process.
 - [x] Stripe subscription scaffold: BillingProvider interface + MockBillingProvider + flat PLANS (Solo/Pro/Agency, AI included never metered) + /billing/plans + /billing/checkout (mock, no charge) + /pricing page. Real StripeBillingProvider is the drop-in (pending STRIPE_*). No live charges.
 - [x] README (setup, env, architecture, security, deploy)
 - [x] Vercel + Fly/Railway deploy configs (vercel.json, Dockerfile, .dockerignore, fly.toml)
