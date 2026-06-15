@@ -437,7 +437,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
   useEffect(() => {
     setWorkspace(workspaceId)
     // Rehydrate saved theme on load
-    const saved = (localStorage.getItem('forge:theme') as 'slate' | 'steampunk') || 'slate'
+    const saved = (localStorage.getItem('forge:theme') as 'slate' | 'steampunk') || 'steampunk'
     setTheme(saved)
   }, [workspaceId, setWorkspace, setTheme])
 

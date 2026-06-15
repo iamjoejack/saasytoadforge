@@ -110,18 +110,19 @@ export default function DashboardPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   
   // Theme state
-  const [theme, setThemeState] = useState<'slate' | 'steampunk'>('slate')
+  const [theme, setThemeState] = useState<'slate' | 'steampunk'>('steampunk')
+
+  function applyThemeClass(t: 'slate' | 'steampunk') {
+    document.body.classList.toggle('theme-steampunk', t === 'steampunk')
+    document.body.classList.toggle('theme-slate', t === 'slate')
+  }
 
   useEffect(() => {
-    // Load saved theme
+    // Load saved theme (brand by default)
     try {
-      const savedTheme = (localStorage.getItem('forge:theme') as 'slate' | 'steampunk') || 'slate'
+      const savedTheme = (localStorage.getItem('forge:theme') as 'slate' | 'steampunk') || 'steampunk'
       setThemeState(savedTheme)
-      if (savedTheme === 'steampunk') {
-        document.body.classList.add('theme-steampunk')
-      } else {
-        document.body.classList.remove('theme-steampunk')
-      }
+      applyThemeClass(savedTheme)
     } catch {
       // ignore
     }
@@ -135,11 +136,7 @@ export default function DashboardPage() {
     } catch {
       // ignore
     }
-    if (next === 'steampunk') {
-      document.body.classList.add('theme-steampunk')
-    } else {
-      document.body.classList.remove('theme-steampunk')
-    }
+    applyThemeClass(next)
   }
 
   useEffect(() => {

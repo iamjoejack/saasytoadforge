@@ -2,7 +2,20 @@
 @import 'tailwindcss';
 
 :root {
-  /* Default Theme: Premium modern slate & indigo */
+  /* Default theme: SaaSyToad Forge brand. Industrial steampunk, brass + copper on near-black. */
+  --background: #060608;
+  --foreground: #ededed;
+  --brass: #c8a24a;
+  --brass-glow: rgba(200, 162, 74, 0.15);
+  --copper: #b56a3a;
+  --copper-glow: rgba(181, 106, 58, 0.15);
+  --gunmetal: #2a2d31;
+  --card-border: rgba(255, 255, 255, 0.06);
+  --glass-bg: rgba(12, 12, 14, 0.65);
+}
+
+.theme-slate {
+  /* Opt-in alternative: modern slate and indigo. */
   --background: #09090b;
   --foreground: #f4f4f5;
   --brass: #6366f1;
@@ -15,7 +28,7 @@
 }
 
 .theme-steampunk {
-  /* SaaSyToad Forge brand: industrial/steampunk on near-black. */
+  /* SaaSyToad Forge brand (same palette as :root); kept so the rivet + Cinzel rules apply. */
   --background: #060608;
   --foreground: #ededed;
   --brass: #c8a24a;

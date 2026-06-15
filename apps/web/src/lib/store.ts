@@ -60,7 +60,7 @@ export const useIde = create<IdeStore>()((set, get) => ({
   dirty: {},
   saving: {},
   editorInstance: null,
-  theme: 'slate',
+  theme: 'steampunk',
   viewMode: 'editor',
   cursorPos: { line: 1, col: 1 },
   activeLanguage: 'plaintext',
@@ -142,11 +142,8 @@ export const useIde = create<IdeStore>()((set, get) => ({
       // ignore
     }
     if (typeof document !== 'undefined') {
-      if (theme === 'steampunk') {
-        document.body.classList.add('theme-steampunk')
-      } else {
-        document.body.classList.remove('theme-steampunk')
-      }
+      document.body.classList.toggle('theme-steampunk', theme === 'steampunk')
+      document.body.classList.toggle('theme-slate', theme === 'slate')
     }
     set({ theme })
   },
