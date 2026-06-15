@@ -48,7 +48,15 @@ export interface ConfigSummary {
   sandboxProvider: string
   egressAllowlist: string[]
   caps: { perUserUsd: number; globalUsd: number }
-  secrets: { openrouter: boolean; e2b: boolean; supabase: boolean; stripe: boolean }
+  secrets: {
+    openrouter: boolean
+    e2b: boolean
+    supabase: boolean
+    stripe: boolean
+    upstashRedis: boolean
+    resend: boolean
+    vercel: boolean
+  }
 }
 
 export interface SpendSummaryDto {

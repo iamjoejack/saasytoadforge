@@ -6,10 +6,87 @@ import Link from 'next/link'
 import * as client from '@/lib/forge-client'
 import type { Workspace } from '@/lib/forge-client'
 import { Toad } from '@/components/Toad'
+import { cn } from '@/lib/cn'
+
+interface ExtensionItem {
+  id: string
+  name: string
+  category: string
+  description: string
+  secretKey: string // mapped key in config.secrets
+  icon: string
+  command: string
+  docUrl: string
+}
+
+const EXTENSIONS_CATALOG: ExtensionItem[] = [
+  {
+    id: 'supabase',
+    name: 'Supabase Postgres & Auth',
+    category: 'Database & Auth',
+    description: 'PostgreSQL database, user authentication, row-level security, and real-time backend structures.',
+    secretKey: 'supabase',
+    icon: '⚡',
+    command: 'stripe projects add supabase',
+    docUrl: 'https://supabase.com/docs',
+  },
+  {
+    id: 'e2b',
+    name: 'E2B Sandboxes',
+    category: 'Secure Code Execution',
+    description: 'Secure, sandboxed browser and terminal execution microVM environments for AI agents.',
+    secretKey: 'e2b',
+    icon: '📦',
+    command: 'stripe projects add e2b',
+    docUrl: 'https://e2b.dev/docs',
+  },
+  {
+    id: 'stripe',
+    name: 'Stripe Billing',
+    category: 'Billing & Subscriptions',
+    description: 'Accept customer payments, manage subscriptions, and verify checkout webhooks.',
+    secretKey: 'stripe',
+    icon: '💳',
+    command: 'stripe projects add stripe',
+    docUrl: 'https://docs.stripe.com',
+  },
+  {
+    id: 'upstash-redis',
+    name: 'Upstash Redis Cache',
+    category: 'Caching & Queues',
+    description: 'Low-latency serverless Redis database for state storage, caching, and worker message queues.',
+    secretKey: 'upstashRedis',
+    icon: '🔴',
+    command: 'stripe projects add upstash-redis',
+    docUrl: 'https://upstash.com/docs',
+  },
+  {
+    id: 'resend',
+    name: 'Resend Email Service',
+    category: 'Transactional Emails',
+    description: 'Modern developer-friendly email API for sending notifications and transactional verification logs.',
+    secretKey: 'resend',
+    icon: '✉',
+    command: 'stripe projects add resend',
+    docUrl: 'https://resend.com/docs',
+  },
+  {
+    id: 'vercel',
+    name: 'Vercel Edge Hosting',
+    category: 'Hosting & Functions',
+    description: 'Deploy frontend apps and backend serverless endpoints instantly on the global edge CDN.',
+    secretKey: 'vercel',
+    icon: '▲',
+    command: 'stripe projects add vercel',
+    docUrl: 'https://vercel.com/docs',
+  },
+]
 
 export default function DashboardPage() {
   const router = useRouter()
   const [items, setItems] = useState<Workspace[] | null>(null)
+  const [config, setConfig] = useState<any | null>(null)
+  const [activeTab, setActiveTab] = useState<'workspaces' | 'extensions'>('workspaces')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
@@ -19,6 +96,7 @@ export default function DashboardPage() {
   const [anthropicKey, setAnthropicKey] = useState('')
   const [googleKey, setGoogleKey] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -26,6 +104,11 @@ export default function DashboardPage() {
       .listWorkspaces()
       .then((ws) => active && setItems(ws))
       .catch(() => active && setItems([]))
+      
+    client
+      .getConfig()
+      .then((cfg) => active && setConfig(cfg))
+      .catch(() => {})
       
     fetch('/api/auth/session')
       .then((r) => r.json())
@@ -88,6 +171,12 @@ export default function DashboardPage() {
     }
   }
 
+  function handleCopy(command: string, id: string) {
+    void navigator.clipboard.writeText(command)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
   return (
     <div className="relative min-h-dvh bg-[var(--background)] py-12 px-6 overflow-hidden">
       {/* Steampunk blueprint circuit grid */}
@@ -132,74 +221,175 @@ export default function DashboardPage() {
         )}
 
         <div className="grid gap-8 md:grid-cols-[1fr_360px]">
-          {/* Left panel: Workspaces */}
-          <div className="space-y-8">
-            <section className="glass-panel riveted rivet-bottom p-6 rounded-2xl shadow-xl">
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <h2 className="font-cinzel text-lg font-bold text-zinc-200">Active Workspaces</h2>
-                  <p className="text-xs text-zinc-500 mt-0.5">Isolated developer sandboxes on E2B</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void create()}
-                  disabled={creating}
-                  className="rounded-lg bg-[var(--brass)] px-4 py-2 text-xs font-semibold text-black transition hover:brightness-110 disabled:opacity-60 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-[var(--brass)]/10"
-                >
-                  {creating ? (
-                    <>
-                      <span className="h-3 w-3 animate-spin rounded-full border border-black border-t-transparent" />
-                      <span>Creating...</span>
-                    </>
-                  ) : (
-                    'New workspace'
-                  )}
-                </button>
-              </div>
+          {/* Left panel: Active Tab switch */}
+          <div className="space-y-6">
+            
+            {/* Tab Switecher */}
+            <div className="flex gap-2 border-b border-white/5 pb-3">
+              <button
+                type="button"
+                onClick={() => setActiveTab('workspaces')}
+                className={cn(
+                  'px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition cursor-pointer',
+                  activeTab === 'workspaces'
+                    ? 'bg-zinc-800 text-[var(--brass)] border border-[var(--brass)]/30'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >
+                Active Sandboxes
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('extensions')}
+                className={cn(
+                  'px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition cursor-pointer',
+                  activeTab === 'extensions'
+                    ? 'bg-zinc-800 text-[var(--brass)] border border-[var(--brass)]/30'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >
+                Forge Extension Store
+              </button>
+            </div>
 
-              <div className="space-y-3">
-                {items === null ? (
-                  [1, 2].map((n) => (
-                    <div key={n} className="h-16 w-full rounded-xl shimmer border border-white/5 opacity-55" />
-                  ))
-                ) : items.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-white/10 px-4 py-12 text-center text-xs text-zinc-500 bg-white/[0.01]">
-                    No sandboxes launched yet. Click &ldquo;New Workspace&rdquo; to boot your first workbench.
+            {activeTab === 'workspaces' ? (
+              <section className="glass-panel riveted rivet-bottom p-6 rounded-2xl shadow-xl">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-cinzel text-lg font-bold text-zinc-200">Active Workspaces</h2>
+                    <p className="text-xs text-zinc-500 mt-0.5">Isolated developer sandboxes on E2B</p>
                   </div>
-                ) : (
-                  items.map((ws) => (
-                    <div
-                      key={ws.id}
-                      className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3.5 hover:border-[var(--brass)]/20 transition"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="relative flex h-2 w-2 shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  <button
+                    type="button"
+                    onClick={() => void create()}
+                    disabled={creating}
+                    className="rounded-lg bg-[var(--brass)] px-4 py-2 text-xs font-semibold text-black transition hover:brightness-110 disabled:opacity-60 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-[var(--brass)]/10"
+                  >
+                    {creating ? (
+                      <>
+                        <span className="h-3 w-3 animate-spin rounded-full border border-black border-t-transparent" />
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      'New workspace'
+                    )}
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {items === null ? (
+                    [1, 2].map((n) => (
+                      <div key={n} className="h-16 w-full rounded-xl shimmer border border-white/5 opacity-55" />
+                    ))
+                  ) : items.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-white/10 px-4 py-12 text-center text-xs text-zinc-500 bg-white/[0.01]">
+                      No sandboxes launched yet. Click &ldquo;New Workspace&rdquo; to boot your first workbench.
+                    </div>
+                  ) : (
+                    items.map((ws) => (
+                      <div
+                        key={ws.id}
+                        className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3.5 hover:border-[var(--brass)]/20 transition"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
+                          <Link
+                            href={`/workspaces/${ws.id}`}
+                            className="font-mono text-xs font-semibold text-zinc-300 hover:text-[var(--brass)] transition truncate"
+                          >
+                            {ws.id}
+                          </Link>
+                        </div>
+                        <span className="text-[10px] text-zinc-600 font-mono hidden sm:inline">
+                          {new Date(ws.createdAt).toLocaleDateString()}
                         </span>
                         <Link
                           href={`/workspaces/${ws.id}`}
-                          className="font-mono text-xs font-semibold text-zinc-300 hover:text-[var(--brass)] transition truncate"
+                          className="text-xs font-bold text-[var(--brass)] hover:underline"
                         >
-                          {ws.id}
+                          Enter Bench →
                         </Link>
                       </div>
-                      <span className="text-[10px] text-zinc-600 font-mono hidden sm:inline">
-                        {new Date(ws.createdAt).toLocaleDateString()}
-                      </span>
-                      <Link
-                        href={`/workspaces/${ws.id}`}
-                        className="text-xs font-bold text-[var(--brass)] hover:underline"
-                      >
-                        Enter Bench →
-                      </Link>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
+                    ))
+                  )}
+                </div>
+              </section>
+            ) : (
+              <section className="glass-panel riveted rivet-bottom p-6 rounded-2xl shadow-xl space-y-6">
+                <div>
+                  <h2 className="font-cinzel text-lg font-bold text-zinc-200">Forge Extension Store</h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Connect API services and platform tools. Link them using the Stripe Projects CLI tool below.
+                  </p>
+                </div>
 
-            {/* Bottom Panel: Extensions settings */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {EXTENSIONS_CATALOG.map((ext) => {
+                    const isConnected = config?.secrets?.[ext.secretKey] ?? false
+                    const isCopied = copiedId === ext.id
+
+                    return (
+                      <div
+                        key={ext.id}
+                        className="flex flex-col rounded-xl border border-white/5 bg-white/[0.01] p-4 hover:border-white/10 transition justify-between"
+                      >
+                        <div>
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="text-xl" role="img" aria-label={ext.name}>
+                              {ext.icon}
+                            </span>
+                            <span
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide border',
+                                isConnected
+                                  ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-400'
+                                  : 'bg-zinc-800/40 border-zinc-700 text-zinc-500'
+                              )}
+                            >
+                              {isConnected ? 'Connected' : 'Available'}
+                            </span>
+                          </div>
+                          
+                          <h3 className="text-xs font-bold text-zinc-200">{ext.name}</h3>
+                          <span className="text-[10px] text-[var(--brass)] font-semibold">{ext.category}</span>
+                          <p className="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
+                            {ext.description}
+                          </p>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-white/5 space-y-2">
+                          <div className="flex items-center justify-between gap-1 bg-black/40 rounded p-1.5 border border-white/5">
+                            <code className="text-[10px] text-zinc-400 font-mono truncate select-all">
+                              {ext.command}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(ext.command, ext.id)}
+                              className="text-[9px] text-[var(--brass)] hover:underline shrink-0 font-bold px-1.5 cursor-pointer"
+                            >
+                              {isCopied ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                          <a
+                            href={ext.docUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-[10px] text-zinc-500 hover:text-zinc-300 font-semibold"
+                          >
+                            Read docs →
+                          </a>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* API settings section */}
             <section className="glass-panel riveted rivet-bottom p-6 rounded-2xl shadow-xl">
               <div className="mb-4">
                 <h2 className="font-cinzel text-lg font-bold text-zinc-200">Developer API Extensions</h2>

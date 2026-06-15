@@ -20,6 +20,9 @@ export const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  UPSTASH_REDIS_REST_URL: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  VERCEL_TOKEN: z.string().optional(),
 
   // Shared secret for web <-> agent-service signed tokens.
   AGENT_SERVICE_SECRET: z.string().default(DEFAULT_AGENT_SERVICE_SECRET),
@@ -75,6 +78,9 @@ export interface SecretStatus {
   e2b: boolean
   supabase: boolean
   stripe: boolean
+  upstashRedis: boolean
+  resend: boolean
+  vercel: boolean
 }
 
 /** Which secret-backed features are live vs running on mocks. */
@@ -86,6 +92,9 @@ export function secretStatus(env: ServerEnv): SecretStatus {
       env.SUPABASE_URL && env.SUPABASE_ANON_KEY && env.SUPABASE_SERVICE_ROLE_KEY,
     ),
     stripe: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET),
+    upstashRedis: Boolean(env.UPSTASH_REDIS_REST_URL),
+    resend: Boolean(env.RESEND_API_KEY),
+    vercel: Boolean(env.VERCEL_TOKEN),
   }
 }
 
