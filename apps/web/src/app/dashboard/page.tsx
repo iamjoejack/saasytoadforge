@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import * as client from '@/lib/forge-client'
 import type { Workspace } from '@/lib/forge-client'
+import type { ConfigSummary } from '@forge/shared'
 import { Toad } from '@/components/Toad'
 import { cn } from '@/lib/cn'
 
@@ -80,12 +81,22 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     command: 'stripe projects add vercel',
     docUrl: 'https://vercel.com/docs',
   },
+  {
+    id: 'zapier',
+    name: 'Zapier Automation',
+    category: 'Integrations & Workflows',
+    description: 'Connect database, queues, and sandbox app triggers directly to over 8,000+ API apps via webhook workflows.',
+    secretKey: 'zapier',
+    icon: '🧡',
+    command: 'stripe projects add zapier',
+    docUrl: 'https://zapier.com/developer',
+  },
 ]
 
 export default function DashboardPage() {
   const router = useRouter()
   const [items, setItems] = useState<Workspace[] | null>(null)
-  const [config, setConfig] = useState<any | null>(null)
+  const [config, setConfig] = useState<ConfigSummary | null>(null)
   const [activeTab, setActiveTab] = useState<'workspaces' | 'extensions'>('workspaces')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -97,6 +108,39 @@ export default function DashboardPage() {
   const [googleKey, setGoogleKey] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  
+  // Theme state
+  const [theme, setThemeState] = useState<'slate' | 'steampunk'>('slate')
+
+  useEffect(() => {
+    // Load saved theme
+    try {
+      const savedTheme = (localStorage.getItem('forge:theme') as 'slate' | 'steampunk') || 'slate'
+      setThemeState(savedTheme)
+      if (savedTheme === 'steampunk') {
+        document.body.classList.add('theme-steampunk')
+      } else {
+        document.body.classList.remove('theme-steampunk')
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  function toggleTheme() {
+    const next = theme === 'slate' ? 'steampunk' : 'slate'
+    setThemeState(next)
+    try {
+      localStorage.setItem('forge:theme', next)
+    } catch {
+      // ignore
+    }
+    if (next === 'steampunk') {
+      document.body.classList.add('theme-steampunk')
+    } else {
+      document.body.classList.remove('theme-steampunk')
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -194,16 +238,30 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex items-center gap-4 text-xs text-zinc-400">
+            {/* Theme switcher */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="rounded-md border border-white/5 bg-white/[0.02] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-zinc-400 hover:text-[var(--brass)] cursor-pointer"
+            >
+              {theme === 'slate' ? '⚙️ Steampunk UI' : '💻 Modern UI'}
+            </button>
+            
+            <span className="text-zinc-650">|</span>
+
             {isAdmin && (
-              <Link
-                href="/admin"
-                className="rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 font-bold uppercase tracking-wider text-amber-500 hover:bg-amber-500/20 transition"
-              >
-                Admin Panel
-              </Link>
+              <>
+                <Link
+                  href="/admin"
+                  className="rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 font-bold uppercase tracking-wider text-amber-500 hover:bg-amber-500/20 transition"
+                >
+                  Admin Panel
+                </Link>
+                <span className="text-zinc-650">|</span>
+              </>
             )}
-            <span className="text-zinc-600">|</span>
             <span className="hidden sm:inline">signed in as <strong className="text-zinc-300 font-medium">{email}</strong></span>
+            <span className="text-zinc-650">|</span>
             <button
               type="button"
               onClick={() => void signOut()}
@@ -328,7 +386,8 @@ export default function DashboardPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   {EXTENSIONS_CATALOG.map((ext) => {
-                    const isConnected = config?.secrets?.[ext.secretKey] ?? false
+                    const isConnected =
+                      (config?.secrets as Record<string, boolean> | undefined)?.[ext.secretKey] ?? false
                     const isCopied = copiedId === ext.id
 
                     return (

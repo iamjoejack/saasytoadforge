@@ -14,20 +14,34 @@ export const serverEnvSchema = z.object({
 
   // Secrets (optional at boot; features degrade to mocks when absent).
   OPENROUTER_API_KEY: z.string().optional(),
+  /** Server-side Anthropic key; when set, Claude drives the agent directly (no OpenRouter). */
+  ANTHROPIC_API_KEY: z.string().optional(),
   E2B_API_KEY: z.string().optional(),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  /** Stripe Price ids for the live checkout. Fall back to mock ids in dev. */
+  STRIPE_PRICE_PRO: z.string().optional(),
+  STRIPE_PRICE_TOPUP_10: z.string().optional(),
+  /** Public web origin used for Stripe success/cancel redirects. */
+  PUBLIC_URL: z.string().optional(),
   UPSTASH_REDIS_REST_URL: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   VERCEL_TOKEN: z.string().optional(),
+  ZAPIER_API_KEY: z.string().optional(),
 
   // Shared secret for web <-> agent-service signed tokens.
   AGENT_SERVICE_SECRET: z.string().default(DEFAULT_AGENT_SERVICE_SECRET),
-  /** Comma-separated list of admin emails. */
-  ADMIN_EMAILS: z.string().default('admin@forge.dev'),
+  /** Comma-separated list of admin emails (access to /admin/stats). */
+  ADMIN_EMAILS: z.string().default('joejackson80@gmail.com'),
+  /**
+   * Comma-separated list of owner/founder emails.
+   * Owners bypass ALL spend caps and have unlimited agent access.
+   * Set this to the company account email(s).
+   */
+  OWNER_EMAILS: z.string().default('joejackson80@gmail.com'),
   /** Allowed browser origin(s) for CORS + websocket, comma-separated. Empty = localhost dev. */
   ALLOWED_ORIGINS: z.string().default(''),
 
@@ -44,6 +58,13 @@ export const serverEnvSchema = z.object({
   MODEL_FAST: z.string().default('openai/gpt-4o-mini'),
   MODEL_FRONTIER: z.string().default('anthropic/claude-sonnet-4'),
   MODEL_DEEP: z.string().default('openrouter/fusion'),
+  /**
+   * Bare Claude model id used when driving Anthropic directly (BYO key or ANTHROPIC_API_KEY).
+   * Must support adaptive thinking; never a legacy claude-3-* id.
+   */
+  ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-5'),
+  /** Bare Gemini model id used when driving Google directly (BYO key). */
+  GOOGLE_MODEL: z.string().default('gemini-2.5-pro'),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
@@ -81,6 +102,7 @@ export interface SecretStatus {
   upstashRedis: boolean
   resend: boolean
   vercel: boolean
+  zapier: boolean
 }
 
 /** Which secret-backed features are live vs running on mocks. */
@@ -95,6 +117,7 @@ export function secretStatus(env: ServerEnv): SecretStatus {
     upstashRedis: Boolean(env.UPSTASH_REDIS_REST_URL),
     resend: Boolean(env.RESEND_API_KEY),
     vercel: Boolean(env.VERCEL_TOKEN),
+    zapier: Boolean(env.ZAPIER_API_KEY),
   }
 }
 
@@ -110,4 +133,14 @@ export function isAdminEmail(email: string | undefined, adminEmailsStr: string):
   if (!email) return false
   const admins = adminEmailsStr.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
   return admins.includes(email.toLowerCase())
+}
+
+/**
+ * Check if the user email is a company owner.
+ * Owners bypass all spend caps — unlimited agent access.
+ */
+export function isOwnerEmail(email: string | undefined, ownerEmailsStr: string): boolean {
+  if (!email) return false
+  const owners = ownerEmailsStr.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+  return owners.includes(email.toLowerCase())
 }

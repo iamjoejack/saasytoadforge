@@ -71,6 +71,10 @@ export class E2BSandboxProvider implements SandboxProvider {
     return this.get(id).files.read(assertSafePath(path))
   }
 
+  async deleteFile(id: string, path: string): Promise<void> {
+    await this.exec(id, `rm -rf "${assertSafePath(path)}"`)
+  }
+
   async listFiles(id: string, dir: string): Promise<FileEntry[]> {
     const entries = await this.get(id).files.list(dir ? assertSafePath(dir) : '.')
     return entries.map((entry) => ({

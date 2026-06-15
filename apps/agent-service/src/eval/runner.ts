@@ -1,6 +1,6 @@
 import type { AgentEvent } from '@forge/shared'
 import { MockSandboxProvider } from '../sandbox'
-import { Agent, ApprovalGate } from '../agent/agent'
+import { Agent, ApprovalGate, QuestionGate } from '../agent/agent'
 import { MockPlanner, type Planner } from '../agent/planner'
 import { createToolSet, MockBrowserTool } from '../agent/tools'
 import { EVAL_CASES, type EvalCase } from './cases'
@@ -34,7 +34,7 @@ export async function runEval(
     const events: AgentEvent[] = []
 
     await new Agent(tools).run(
-      { task: evalCase.task, planner: makePlanner(), approvals: new ApprovalGate() },
+      { task: evalCase.task, planner: makePlanner(), approvals: new ApprovalGate(), questions: new QuestionGate() },
       (e) => events.push(e),
     )
 

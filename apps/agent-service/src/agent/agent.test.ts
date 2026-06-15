@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { AgentEvent } from '@forge/shared'
 import { MockSandboxProvider } from '../sandbox'
-import { Agent, ApprovalGate } from './agent'
+import { Agent, ApprovalGate, QuestionGate } from './agent'
 import { MockPlanner } from './planner'
 import { MockBrowserTool, createToolSet } from './tools'
 
@@ -20,7 +20,7 @@ describe('Agent loop (mock)', () => {
     const { provider, sandboxId, agent } = await setup()
     const events: AgentEvent[] = []
     const { ok } = await agent.run(
-      { task: TIME_TASK, planner: new MockPlanner(), approvals: new ApprovalGate() },
+      { task: TIME_TASK, planner: new MockPlanner(), approvals: new ApprovalGate(), questions: new QuestionGate() },
       (e) => events.push(e),
     )
 
@@ -52,7 +52,7 @@ describe('Agent loop (mock)', () => {
     const { provider, sandboxId, agent } = await setup()
     const events: AgentEvent[] = []
     const { ok } = await agent.run(
-      { task: UI_TASK, planner: new MockPlanner(), approvals: new ApprovalGate() },
+      { task: UI_TASK, planner: new MockPlanner(), approvals: new ApprovalGate(), questions: new QuestionGate() },
       (e) => events.push(e),
     )
 
@@ -87,7 +87,7 @@ describe('Agent loop (mock)', () => {
     const gate = new ApprovalGate()
     const events: AgentEvent[] = []
     const { ok } = await agent.run(
-      { task: TIME_TASK, planner: new MockPlanner(), approvals: gate, requireWriteApproval: true },
+      { task: TIME_TASK, planner: new MockPlanner(), approvals: gate, requireWriteApproval: true, questions: new QuestionGate() },
       (e) => {
         events.push(e)
         if (e.type === 'approval') queueMicrotask(() => gate.resolve(e.id, true))
@@ -106,7 +106,7 @@ describe('Agent loop (mock)', () => {
       plan: () => Promise.reject(new Error('planner exploded')),
     }
     const { ok } = await agent.run(
-      { task: 'anything', planner: failing, approvals: new ApprovalGate() },
+      { task: 'anything', planner: failing, approvals: new ApprovalGate(), questions: new QuestionGate() },
       (e) => events.push(e),
     )
     expect(ok).toBe(false)
@@ -120,7 +120,7 @@ describe('Agent loop (mock)', () => {
     const gate = new ApprovalGate()
     const events: AgentEvent[] = []
     const { ok } = await agent.run(
-      { task: TIME_TASK, planner: new MockPlanner(), approvals: gate, requireWriteApproval: true },
+      { task: TIME_TASK, planner: new MockPlanner(), approvals: gate, requireWriteApproval: true, questions: new QuestionGate() },
       (e) => {
         events.push(e)
         if (e.type === 'approval') queueMicrotask(() => gate.resolve(e.id, false))

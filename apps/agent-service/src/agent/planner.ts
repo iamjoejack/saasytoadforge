@@ -194,6 +194,8 @@ export function parsePlan(raw: string): AgentAction[] {
 }
 
 export function createPlanner(env: ServerEnv, llm: LlmClient): Planner {
-  if (llm.kind === 'openrouter') return new LlmPlanner(llm, modelFor(env, 'frontier'))
+  // Any real model (OpenRouter, Anthropic, Google) drives the structured planner.
+  // The deterministic MockPlanner is used only when no key is configured.
+  if (llm.kind !== 'mock') return new LlmPlanner(llm, modelFor(env, 'frontier'))
   return new MockPlanner()
 }

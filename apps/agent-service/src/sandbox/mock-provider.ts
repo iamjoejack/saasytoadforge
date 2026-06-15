@@ -155,6 +155,20 @@ export class MockSandboxProvider implements SandboxProvider {
     return contents
   }
 
+  async deleteFile(id: string, path: string): Promise<void> {
+    const normalized = normalizePath(path)
+    const state = this.state(id)
+    state.files.delete(normalized)
+    
+    // Recursively delete folder children
+    const prefix = normalized + '/'
+    for (const key of Array.from(state.files.keys())) {
+      if (key.startsWith(prefix)) {
+        state.files.delete(key)
+      }
+    }
+  }
+
   async listFiles(id: string, dir: string): Promise<FileEntry[]> {
     const files = this.state(id).files
     const prefix = normalizePath(dir)

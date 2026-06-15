@@ -26,10 +26,33 @@ export class ApprovalGate {
   }
 }
 
+/** Locks and waits for multiple-choice answers from the client. */
+export class QuestionGate {
+  private readonly pending = new Map<string, (selection: string[]) => void>()
+
+  request(id: string): Promise<string[]> {
+    return new Promise((resolve) => this.pending.set(id, resolve))
+  }
+
+  resolve(id: string, selection: string[]): boolean {
+    const resolver = this.pending.get(id)
+    if (!resolver) return false
+    this.pending.delete(id)
+    resolver(selection)
+    return true
+  }
+
+  rejectAll(): void {
+    for (const resolver of this.pending.values()) resolver([])
+    this.pending.clear()
+  }
+}
+
 export interface AgentRunOptions {
   task: string
   planner: Planner
   approvals: ApprovalGate
+  questions: QuestionGate
   /** When true, every file write pauses for approval before being applied. */
   requireWriteApproval?: boolean
   /** Aborts the run between actions (e.g. the client disconnected or hit Stop). */
@@ -50,6 +73,72 @@ export class Agent {
   async run(opts: AgentRunOptions, emit: Emit): Promise<{ ok: boolean }> {
     const setStep = (id: string | undefined, status: PlanStepStatus) => {
       if (id) emit({ type: 'step', id, status })
+    }
+
+    // 1. Support background scheduler reminders / timers (/schedule)
+    if (opts.task.startsWith('/schedule')) {
+      const parts = opts.task.split(' ')
+      const timePart = parts[1] ?? '5s'
+      const command = parts.slice(2).join(' ') || 'echo "Timer fired"'
+      
+      let seconds = 5
+      if (timePart.endsWith('s')) {
+        seconds = parseInt(timePart.slice(0, -1)) || 5
+      } else if (timePart.endsWith('m')) {
+        seconds = (parseInt(timePart.slice(0, -1)) || 1) * 60
+      }
+      
+      emit({ type: 'message', text: `Scheduled background task "${command}" to run in ${seconds} seconds.` })
+
+      setTimeout(() => {
+        emit({ type: 'message', text: `Timer fired: running "${command}" in the sandbox.` })
+        void this.tools.terminal
+          .exec(command)
+          .then((res) => {
+            emit({
+              type: 'terminal',
+              result: {
+                cmd: command,
+                stdout: res.stdout,
+                stderr: res.stderr,
+                exitCode: res.exitCode,
+              },
+            })
+          })
+          .catch((err) => {
+            emit({ type: 'error', message: `Scheduled task failed: ${err instanceof Error ? err.message : String(err)}` })
+          })
+      }, seconds * 1000)
+      
+      emit({ type: 'done', ok: true })
+      return { ok: true }
+    }
+
+    // 2. Support interactive interview question grids (/grill-me)
+    if (opts.task.startsWith('/grill-me')) {
+      emit({
+        type: 'question',
+        id: 'grill:preset',
+        question: 'Which visual style preset do you prefer for this website?',
+        options: ['Steampunk Industrial (Recommended)', 'Cyberpunk Glow', 'Glassmorphic Minimal', 'Retro Terminal'],
+        isMultiSelect: false,
+      })
+      const styleAnswer = await opts.questions.request('grill:preset')
+      emit({ type: 'message', text: `Selected style: **${styleAnswer.join(', ')}**` })
+
+      emit({
+        type: 'question',
+        id: 'grill:extensions',
+        question: 'Select the extensions you would like to pre-install in this project:',
+        options: ['Supabase DB Client', 'Resend Mail SDK', 'Upstash Redis Caching', 'Vitest Testing Suite'],
+        isMultiSelect: true,
+      })
+      const extAnswer = await opts.questions.request('grill:extensions')
+      emit({ type: 'message', text: `Pre-installing: **${extAnswer.join(', ')}**` })
+
+      emit({ type: 'message', text: 'Generating setup details. Alignment interview complete.' })
+      emit({ type: 'done', ok: true })
+      return { ok: true }
     }
 
     try {

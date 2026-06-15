@@ -48,15 +48,29 @@ export class SupabaseSessionStore implements SessionStore {
       .order('created_at', { ascending: false })
       
     if (error) throw new Error(`Failed to list sessions: ${error.message}`)
-    
-    return (data || []).map((row: any) => ({
+
+    interface ArtifactRow {
+      kind: string
+      payload: AgentEvent
+      created_at: string
+    }
+    interface SessionRow {
+      id: string
+      workspace_id: string
+      task: string
+      created_at: string
+      artifacts?: ArtifactRow[]
+    }
+
+    return ((data ?? []) as SessionRow[]).map((row) => ({
       id: row.id,
       workspaceId: row.workspace_id,
       task: row.task,
       createdAt: row.created_at,
-      artifacts: (row.artifacts || [])
-        .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-        .map((a: any) => a.payload as AgentEvent),
+      artifacts: (row.artifacts ?? [])
+        .slice()
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .map((a) => a.payload),
     }))
   }
 }

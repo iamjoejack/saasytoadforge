@@ -4,10 +4,12 @@ import { PLANS, MockBillingProvider, createBillingProvider } from './billing'
 
 describe('billing plans', () => {
   it('offers flat plans with AI included and no metering', () => {
-    expect(PLANS.map((p) => p.id)).toEqual(['solo', 'pro', 'agency'])
+    expect(PLANS.map((p) => p.id)).toEqual(['pro', 'topup_10'])
     for (const plan of PLANS) {
       expect(plan.priceUsd).toBeGreaterThan(0)
-      expect(plan.features.some((f) => /never metered/i.test(f))).toBe(true)
+      if (plan.interval !== 'one-time') {
+        expect(plan.features.some((f) => /never metered/i.test(f))).toBe(true)
+      }
     }
   })
 })

@@ -1,11 +1,21 @@
 export interface SpendCaps {
   perUserUsd: number
   globalUsd: number
+  /** When true the per-user hard cap is removed; hitting the soft limit triggers an approval event instead. */
+  unlimitedMode?: boolean
+  /** USD per approval block in unlimited mode (default $5). */
+  approvalBlockUsd?: number
+  /** Max USD to auto-approve in unlimited mode without prompting (0 = always prompt). */
+  autoApproveUsd?: number
 }
 
 export interface SpendCheck {
   allowed: boolean
+  /** Hard-blocked reason (unlimited mode OFF). */
   reason?: string
+  /** Soft-cap hit in unlimited mode — must gate behind an approval event before proceeding. */
+  needsApproval?: boolean
+  approvalDetail?: string
 }
 
 export interface SpendSummary {
@@ -36,6 +46,9 @@ export function costForTokens(model: string, totalTokens: number): number {
  */
 export class SpendLedger {
   private readonly perUser = new Map<string, number>()
+  private readonly userExtraCredits = new Map<string, number>()
+  /** Extra credits keyed by email, so a paid top-up (webhook carries only the email) is attributable. */
+  private readonly emailExtraCredits = new Map<string, number>()
   private total = 0
 
   record(userId: string, usd: number): void {
@@ -47,6 +60,25 @@ export class SpendLedger {
     return this.perUser.get(userId) ?? 0
   }
 
+  addExtraCredits(userId: string, usd: number): void {
+    this.userExtraCredits.set(userId, (this.userExtraCredits.get(userId) ?? 0) + usd)
+  }
+
+  userExtraCreditsAmount(userId: string): number {
+    return this.userExtraCredits.get(userId) ?? 0
+  }
+
+  /** Credit a paid top-up by email (fulfilled from a verified Stripe webhook). */
+  addEmailCredits(email: string, usd: number): void {
+    const key = email.toLowerCase()
+    this.emailExtraCredits.set(key, (this.emailExtraCredits.get(key) ?? 0) + usd)
+  }
+
+  emailCreditsAmount(email?: string): number {
+    if (!email) return 0
+    return this.emailExtraCredits.get(email.toLowerCase()) ?? 0
+  }
+
   globalSpend(): number {
     return this.total
   }
@@ -55,22 +87,41 @@ export class SpendLedger {
     return [...this.perUser.entries()].map(([userId, usd]) => ({ userId, usd }))
   }
 
-  check(userId: string, estUsd: number, caps: SpendCaps): SpendCheck {
-    if (this.userSpend(userId) + estUsd > caps.perUserUsd) {
-      return { allowed: false, reason: 'per-user spend cap reached' }
-    }
+  check(userId: string, estUsd: number, caps: SpendCaps, email?: string): SpendCheck {
+    const userCap =
+      caps.perUserUsd + this.userExtraCreditsAmount(userId) + this.emailCreditsAmount(email)
+    const userSpend = this.userSpend(userId)
+
+    // Global cap is always enforced regardless of unlimited mode.
     if (this.total + estUsd > caps.globalUsd) {
       return { allowed: false, reason: 'global spend cap reached' }
+    }
+
+    if (userSpend + estUsd > userCap) {
+      if (caps.unlimitedMode) {
+        // Unlimited mode: soft-cap hit — surface an approval prompt rather than blocking.
+        const blockUsd = caps.approvalBlockUsd ?? 5
+        return {
+          allowed: false,
+          needsApproval: true,
+          approvalDetail:
+            `You have reached your $${userCap.toFixed(2)} base credit limit. ` +
+            `Approve a $${blockUsd.toFixed(2)} credit extension to continue this run?`,
+        }
+      }
+      return { allowed: false, reason: `per-user spend cap of $${userCap.toFixed(2)} reached` }
     }
     return { allowed: true }
   }
 
-  summary(userId: string, caps: SpendCaps): SpendSummary {
+  summary(userId: string, caps: SpendCaps, email?: string): SpendSummary {
+    const userCap =
+      caps.perUserUsd + this.userExtraCreditsAmount(userId) + this.emailCreditsAmount(email)
     return {
       userUsd: this.userSpend(userId),
       globalUsd: this.total,
-      caps,
-      userRemainingUsd: Math.max(0, caps.perUserUsd - this.userSpend(userId)),
+      caps: { ...caps, perUserUsd: userCap },
+      userRemainingUsd: Math.max(0, userCap - this.userSpend(userId)),
       globalRemainingUsd: Math.max(0, caps.globalUsd - this.total),
     }
   }

@@ -97,11 +97,23 @@ export async function writeFile(id: string, path: string, contents: string): Pro
   })
 }
 
+export async function deleteFile(id: string, path: string): Promise<void> {
+  await authed(`/workspaces/${id}/file?path=${encodeURIComponent(path)}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function exec(id: string, cmd: string): Promise<ExecResult> {
   return authed(`/workspaces/${id}/exec`, {
     method: 'POST',
     headers: JSON_HEADERS,
     body: JSON.stringify({ cmd }),
+  })
+}
+
+export async function deployWorkspace(id: string): Promise<{ ok: boolean; url: string; logs: string }> {
+  return authed(`/workspaces/${id}/deploy`, {
+    method: 'POST',
   })
 }
 

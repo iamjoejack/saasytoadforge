@@ -53,6 +53,7 @@ export interface SandboxProvider {
   exec(id: string, cmd: string, opts?: ExecOptions): Promise<ExecResult>
   writeFile(id: string, path: string, contents: string): Promise<void>
   readFile(id: string, path: string): Promise<string>
+  deleteFile(id: string, path: string): Promise<void>
   listFiles(id: string, dir: string): Promise<FileEntry[]>
   /** Streamed to the xterm terminal. */
   openShell(id: string): AsyncShellSession

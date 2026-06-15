@@ -25,9 +25,9 @@ export default function PricingPage() {
     try {
       const res = await client.createCheckout(planId)
       window.location.href = res.url
-    } catch (err: any) {
+    } catch (err) {
       console.error('Checkout redirect failed:', err)
-      setError(err?.message ?? 'Failed to initiate checkout. Please try again.')
+      setError(err instanceof Error ? err.message : 'Failed to initiate checkout. Please try again.')
       setLoadingPlanId(null)
     }
   }
@@ -62,7 +62,7 @@ export default function PricingPage() {
           No plans available at the moment.
         </p>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 max-w-2xl mx-auto">
           {plans.map((plan) => {
             const isPro = plan.id === 'pro'
             const isLoading = loadingPlanId === plan.id

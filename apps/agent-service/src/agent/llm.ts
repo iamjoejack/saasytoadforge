@@ -24,7 +24,11 @@ export class MockLlmClient implements LlmClient {
 
   async complete(opts: CompleteOptions): Promise<string> {
     const lastUser = [...opts.messages].reverse().find((m) => m.role === 'user')
-    const text = `Ronald (mock): I read "${lastUser?.content ?? ''}". Connect OPENROUTER_API_KEY for a real reply.`
+    const userPrompt = lastUser?.content ?? ''
+
+    const text =
+      `Ronald here, running in offline mode. I read your request: "${userPrompt.slice(0, 280)}". ` +
+      `Add an Anthropic or Google key in settings, or set OPENROUTER_API_KEY, and I will work it for real.`
     for (const word of text.split(' ')) {
       opts.onChunk?.(`${word} `)
     }
@@ -42,7 +46,64 @@ export class OpenRouterLlmClient implements LlmClient {
 
   constructor(private readonly apiKey: string) {}
 
+  async completeSingle(model: string, messages: LlmMessage[], signal?: AbortSignal): Promise<string> {
+    const res = await fetch(this.endpoint, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${this.apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ model, messages, stream: false }),
+      signal,
+    })
+    if (!res.ok) {
+      throw new Error(`openrouter single completions: ${res.status} ${res.statusText}`)
+    }
+    const json = await res.json() as {
+      choices?: Array<{ message?: { content?: string } }>
+    }
+    return json.choices?.[0]?.message?.content || ''
+  }
+
   async complete(opts: CompleteOptions): Promise<string> {
+    if (opts.model === 'openrouter/fusion') {
+      opts.onChunk?.('Fusing models: calling Llama-3-8B, Gemini-2.5-Flash, and Mistral-7B in parallel...\n')
+
+      const freeModels = [
+        'meta-llama/llama-3-8b-instruct:free',
+        'google/gemini-2.5-flash:free',
+        'mistralai/mistral-7b-instruct:free'
+      ]
+      
+      const responses = await Promise.all(
+        freeModels.map(m => 
+          this.completeSingle(m, opts.messages, opts.signal)
+            .catch(err => `[Model ${m} call failed: ${err instanceof Error ? err.message : String(err)}]`)
+        )
+      )
+      
+      opts.onChunk?.('\nPanel responses gathered. Invoking the judge model for final synthesis...\n\n')
+      
+      const userPrompt = opts.messages[opts.messages.length - 1]?.content || ''
+      const judgeMessages: LlmMessage[] = [
+        {
+          role: 'system',
+          content: 'You are an expert developer judge. You have been given a prompt and three proposed answers from different developer assistant models. Synthesize their answers, reconcile contradictions, extract the best coding logic, and output a single refined developer instruction. Do not include raw conversational filler; yield clean instructions.'
+        },
+        {
+          role: 'user',
+          content: `Original User Prompt:\n${userPrompt}\n\nCandidate Answer 1 (Llama-3):\n${responses[0]}\n\nCandidate Answer 2 (Gemini-Flash):\n${responses[1]}\n\nCandidate Answer 3 (Mistral-7B):\n${responses[2]}\n\nFinal Synthesized Solution:`
+        }
+      ]
+      
+      // Delegate to standard streaming path with the frontier/judge model
+      return this.complete({
+        ...opts,
+        model: 'google/gemini-2.5-pro', // Gemini 2.5 Pro as Judge
+        messages: judgeMessages
+      })
+    }
+
     const res = await fetch(this.endpoint, {
       method: 'POST',
       headers: {
@@ -97,7 +158,25 @@ export class AnthropicLlmClient implements LlmClient {
   readonly kind = 'anthropic' as const
   private readonly endpoint = 'https://api.anthropic.com/v1/messages'
 
-  constructor(private readonly apiKey: string) {}
+  /**
+   * @param apiKey       caller-supplied Anthropic key
+   * @param defaultModel current Claude model id used when the routed model is not a Claude id
+   *                     (env ANTHROPIC_MODEL). Never a claude-3-* id: those lack adaptive
+   *                     thinking and are below our floor.
+   */
+  constructor(
+    private readonly apiKey: string,
+    private readonly defaultModel = 'claude-sonnet-4-5',
+  ) {}
+
+  /** Resolve a bare Anthropic model id, honouring an explicit Claude routing id. */
+  private resolveModel(model: string): string {
+    // Strip an OpenRouter-style "anthropic/" prefix, e.g. "anthropic/claude-sonnet-4".
+    const bare = model.includes('/') ? (model.split('/').pop() ?? model) : model
+    // Use an explicit Claude id as-is, but never a legacy claude-3-* id.
+    if (bare.startsWith('claude-') && !bare.startsWith('claude-3')) return bare
+    return this.defaultModel
+  }
 
   async complete(opts: CompleteOptions): Promise<string> {
     const systemMessage = opts.messages.find((m) => m.role === 'system')?.content
@@ -108,14 +187,7 @@ export class AnthropicLlmClient implements LlmClient {
         content: m.content,
       }))
 
-    let modelName = opts.model
-    if (modelName.includes('claude-sonnet-4') || modelName.includes('claude-3-5-sonnet')) {
-      modelName = 'claude-3-5-sonnet-20241022'
-    } else if (modelName.includes('gpt-4o-mini') || modelName.includes('mini')) {
-      modelName = 'claude-3-5-haiku-20241022'
-    } else {
-      modelName = 'claude-3-5-sonnet-20241022'
-    }
+    const modelName = this.resolveModel(opts.model)
 
     const res = await fetch(this.endpoint, {
       method: 'POST',
@@ -179,7 +251,10 @@ export class AnthropicLlmClient implements LlmClient {
 export class GeminiLlmClient implements LlmClient {
   readonly kind = 'google' as const
 
-  constructor(private readonly apiKey: string) {}
+  constructor(
+    private readonly apiKey: string,
+    private readonly defaultModel = 'gemini-2.5-pro',
+  ) {}
 
   async complete(opts: CompleteOptions): Promise<string> {
     const systemMessage = opts.messages.find((m) => m.role === 'system')?.content
@@ -190,16 +265,20 @@ export class GeminiLlmClient implements LlmClient {
         parts: [{ text: m.content }],
       }))
 
-    let modelName = opts.model
-    if (modelName.includes('claude') || modelName.includes('frontier') || modelName.includes('sonnet')) {
-      modelName = 'gemini-2.5-pro'
-    } else {
-      modelName = 'gemini-2.5-flash'
-    }
+    const model = opts.model
+    const modelName = model.startsWith('gemini-')
+      ? model
+      : model.includes('fast') || model.includes('mini')
+        ? 'gemini-2.5-flash'
+        : this.defaultModel
 
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${this.apiKey}`
 
-    const body: any = {
+    interface GeminiBody {
+      contents: Array<{ role: string; parts: Array<{ text: string }> }>
+      systemInstruction?: { parts: Array<{ text: string }> }
+    }
+    const body: GeminiBody = {
       contents: restMessages,
     }
     if (systemMessage) {
@@ -240,6 +319,7 @@ export class GeminiLlmClient implements LlmClient {
       if (parts.length > 1) {
         for (let i = 0; i < parts.length - 1; i++) {
           let part = parts[i]
+          if (part === undefined) continue
           if (!part.startsWith('{')) part = '{' + part
           if (!part.endsWith('}')) part = part + '}'
           try {
@@ -282,8 +362,11 @@ export function createLlmClient(
   env: ServerEnv,
   customKeys?: { anthropic?: string; google?: string },
 ): LlmClient {
-  if (customKeys?.anthropic) return new AnthropicLlmClient(customKeys.anthropic)
-  if (customKeys?.google) return new GeminiLlmClient(customKeys.google)
+  // A user-supplied key takes precedence so "bring your own Claude" works end to end.
+  if (customKeys?.anthropic) return new AnthropicLlmClient(customKeys.anthropic, env.ANTHROPIC_MODEL)
+  if (customKeys?.google) return new GeminiLlmClient(customKeys.google, env.GOOGLE_MODEL)
+  // A server-side Anthropic key drives Claude directly (no OpenRouter needed).
+  if (env.ANTHROPIC_API_KEY) return new AnthropicLlmClient(env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL)
   if (env.OPENROUTER_API_KEY) return new OpenRouterLlmClient(env.OPENROUTER_API_KEY)
   return new MockLlmClient()
 }

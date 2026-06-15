@@ -1,6 +1,23 @@
 import { create } from 'zustand'
 import * as client from './forge-client'
 
+/**
+ * Minimal structural view of the Monaco editor we drive from the IDE chrome.
+ * Avoids pulling the full monaco type graph into the store while staying type-safe.
+ */
+export interface CodeEditor {
+  focus(): void
+  getSelection(): unknown
+  executeEdits(
+    source: string,
+    edits: Array<{ range: unknown; text: string; forceMoveMarkers?: boolean }>,
+  ): unknown
+  getAction(id: string): { run(): unknown } | null
+  trigger(source: string, handlerId: string, payload: unknown): void
+  revealLine(line: number): void
+  setPosition(position: { lineNumber: number; column: number }): void
+}
+
 interface IdeStore {
   workspaceId: string | null
   activePath: string | null
@@ -8,6 +25,9 @@ interface IdeStore {
   contents: Record<string, string>
   dirty: Record<string, boolean>
   saving: Record<string, boolean>
+  editorInstance: CodeEditor | null
+  theme: 'slate' | 'steampunk'
+  viewMode: 'editor' | 'browser'
 
   setWorkspace: (id: string) => void
   openFile: (path: string) => Promise<void>
@@ -15,6 +35,16 @@ interface IdeStore {
   closeTab: (path: string) => void
   edit: (path: string, value: string) => void
   save: (path: string) => Promise<void>
+  setEditorInstance: (editor: CodeEditor | null) => void
+  insertSnippet: (snippet: string) => void
+  setTheme: (theme: 'slate' | 'steampunk') => void
+  setViewMode: (mode: 'editor' | 'browser') => void
+  /** Live cursor position from Monaco editor. */
+  cursorPos: { line: number; col: number }
+  setCursorPos: (pos: { line: number; col: number }) => void
+  /** Detected language of the active file. */
+  activeLanguage: string
+  setActiveLanguage: (lang: string) => void
 }
 
 /**
@@ -29,6 +59,14 @@ export const useIde = create<IdeStore>()((set, get) => ({
   contents: {},
   dirty: {},
   saving: {},
+  editorInstance: null,
+  theme: 'slate',
+  viewMode: 'editor',
+  cursorPos: { line: 1, col: 1 },
+  activeLanguage: 'plaintext',
+
+  setCursorPos: (pos) => set({ cursorPos: pos }),
+  setActiveLanguage: (lang) => set({ activeLanguage: lang }),
 
   setWorkspace: (id) => set({ workspaceId: id }),
 
@@ -78,4 +116,40 @@ export const useIde = create<IdeStore>()((set, get) => ({
       throw err
     }
   },
+
+  setEditorInstance: (editor) => set({ editorInstance: editor }),
+
+  insertSnippet: (snippet) => {
+    const editor = get().editorInstance
+    if (editor) {
+      const selection = editor.getSelection()
+      if (selection) {
+        editor.executeEdits('insertSnippet', [
+          {
+            range: selection,
+            text: snippet,
+            forceMoveMarkers: true,
+          },
+        ])
+      }
+    }
+  },
+
+  setTheme: (theme) => {
+    try {
+      localStorage.setItem('forge:theme', theme)
+    } catch {
+      // ignore
+    }
+    if (typeof document !== 'undefined') {
+      if (theme === 'steampunk') {
+        document.body.classList.add('theme-steampunk')
+      } else {
+        document.body.classList.remove('theme-steampunk')
+      }
+    }
+    set({ theme })
+  },
+
+  setViewMode: (viewMode) => set({ viewMode }),
 }))

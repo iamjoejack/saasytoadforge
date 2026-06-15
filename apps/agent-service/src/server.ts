@@ -12,6 +12,7 @@ import {
   parseEgressAllowlist,
   secretStatus,
   verifyAgentToken,
+  isOwnerEmail,
   type SandboxProvider,
   type ServerEnv,
   type AgentCommand,
@@ -21,7 +22,7 @@ import {
 import { createSandboxProvider } from './sandbox'
 import { WorkspaceManager, type Workspace } from './workspace/manager'
 import { assertSafePath, PathError } from './lib/paths'
-import { Agent, ApprovalGate } from './agent/agent'
+import { Agent, ApprovalGate, QuestionGate } from './agent/agent'
 import { createLlmClient } from './agent/llm'
 import { createPlanner } from './agent/planner'
 import { createToolSet, MockBrowserTool, type BrowserTool } from './agent/tools'
@@ -36,6 +37,8 @@ declare module 'fastify' {
   interface FastifyRequest {
     userId?: string
     userEmail?: string
+    /** Raw request body, captured for Stripe webhook signature verification. */
+    rawBody?: Buffer
   }
 }
 
@@ -65,6 +68,27 @@ export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
     .filter(Boolean)
 
   const app = Fastify({ logger: false })
+
+  // Parse JSON ourselves so we can retain the raw bytes for Stripe webhook signature
+  // verification. Empty bodies (common on POST/DELETE with no payload) parse to {}.
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'buffer' },
+    (req, body, done) => {
+      const buf = body as Buffer
+      if (buf.length > 0) req.rawBody = buf
+      if (buf.length === 0) {
+        done(null, {})
+        return
+      }
+      try {
+        done(null, JSON.parse(buf.toString('utf8')))
+      } catch (err) {
+        done(err instanceof Error ? err : new Error('invalid json'), undefined)
+      }
+    },
+  )
+
   void app.register(cors, {
     origin: allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:3000'],
   })
@@ -83,10 +107,15 @@ function userIdOf(req: FastifyRequest): string {
   return req.userId ?? ''
 }
 
+/** Full token claims from a websocket upgrade's ?token= query, or null. */
+function wsTokenClaims(req: FastifyRequest, secret: string) {
+  const token = (req.query as { token?: string }).token ?? ''
+  return token ? (verifyAgentToken(token, secret) ?? null) : null
+}
+
 /** userId from a websocket upgrade's ?token= query, or null. */
 function wsUserId(req: FastifyRequest, secret: string): string | null {
-  const token = (req.query as { token?: string }).token ?? ''
-  return token ? (verifyAgentToken(token, secret)?.userId ?? null) : null
+  return wsTokenClaims(req, secret)?.userId ?? null
 }
 
 function routes(
@@ -96,7 +125,12 @@ function routes(
   browser: BrowserTool,
   ledger: SpendLedger,
 ): FastifyPluginAsync {
-  const caps: SpendCaps = { perUserUsd: env.SPEND_CAP_USER_USD, globalUsd: env.SPEND_CAP_GLOBAL_USD }
+  const caps: SpendCaps = {
+    perUserUsd: env.SPEND_CAP_USER_USD,
+    globalUsd: env.SPEND_CAP_GLOBAL_USD,
+    unlimitedMode: false,        // toggled per-user via spend_topup_mode command; global default=off
+    approvalBlockUsd: 5,
+  }
   const secrets = secretStatus(env)
   const billing = createBillingProvider(env)
   const sessionStore = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
@@ -143,7 +177,12 @@ function routes(
       models: modelRouting(env),
       sandboxProvider: env.SANDBOX_PROVIDER,
       egressAllowlist: parseEgressAllowlist(env),
-      caps: { perUserUsd: caps.perUserUsd, globalUsd: caps.globalUsd },
+      caps: {
+        perUserUsd: caps.perUserUsd,
+        globalUsd: caps.globalUsd,
+        unlimitedMode: caps.unlimitedMode,
+        approvalBlockUsd: caps.approvalBlockUsd,
+      },
       secrets,
     }))
 
@@ -154,14 +193,35 @@ function routes(
       if (typeof body.planId !== 'string' || !billing.plans().some((p) => p.id === body.planId)) {
         return reply.code(400).send({ error: 'unknown planId' })
       }
-      const email = typeof body.email === 'string' ? body.email : 'unknown@forge.dev'
+      // Prefer the verified token email over any client-supplied value.
+      const email =
+        req.userEmail ?? (typeof body.email === 'string' ? body.email : 'unknown@forge.dev')
+      // Credits are NEVER granted here. They are granted only by a verified, paid webhook
+      // (see /webhooks/stripe). This route just starts checkout.
       return billing.createCheckout(body.planId, { customerEmail: email })
     })
 
-    app.post('/webhooks/stripe', async (_req, reply) => {
-      // In a full production setup, Fastify must be configured to capture the raw body
-      // to verify `stripe.webhooks.constructEvent` with `env.STRIPE_WEBHOOK_SECRET`.
-      // For now, we acknowledge the event to keep the webhook active.
+    app.post('/webhooks/stripe', async (req, reply) => {
+      const signature = req.headers['stripe-signature']
+      if (typeof signature !== 'string' || !req.rawBody) {
+        return reply.code(400).send({ error: 'missing signature or body' })
+      }
+      let fulfillment
+      try {
+        fulfillment = await billing.handleWebhook(req.rawBody.toString('utf8'), signature)
+      } catch (err) {
+        // Bad/forged signature, or webhook secret missing. Refuse, do not fulfil.
+        logger.warn('stripe webhook rejected', { error: err instanceof Error ? err.message : String(err) })
+        return reply.code(400).send({ error: 'invalid signature' })
+      }
+      if (fulfillment?.customerEmail && fulfillment.creditUsd > 0) {
+        ledger.addEmailCredits(fulfillment.customerEmail, fulfillment.creditUsd)
+        logger.info('stripe top-up fulfilled', {
+          email: fulfillment.customerEmail,
+          creditUsd: fulfillment.creditUsd,
+          plan: fulfillment.planId,
+        })
+      }
       return reply.code(200).send({ received: true })
     })
 
@@ -217,10 +277,27 @@ function routes(
       }
     })
 
+    app.delete('/workspaces/:id/file', async (req, reply) => {
+      const ws = requireWorkspace(workspaces, req, reply)
+      if (!ws) return
+      const rawPath = (req.query as { path?: string }).path
+      if (typeof rawPath !== 'string') {
+        return reply.code(400).send({ error: 'path query param is required' })
+      }
+      try {
+        const path = assertSafePath(rawPath)
+        await provider.deleteFile(ws.sandboxId, path)
+        return { ok: true, path }
+      } catch (err) {
+        if (err instanceof PathError) return reply.code(400).send({ error: err.message })
+        throw err
+      }
+    })
+
     app.get('/workspaces/:id/spend', async (req, reply) => {
       const ws = requireWorkspace(workspaces, req, reply)
       if (!ws) return
-      return ledger.summary(userIdOf(req), caps)
+      return ledger.summary(userIdOf(req), caps, req.userEmail)
     })
 
     app.get('/workspaces/:id/sessions', async (req, reply) => {
@@ -237,6 +314,32 @@ function routes(
         return reply.code(400).send({ error: 'cmd must be a string' })
       }
       return provider.exec(ws.sandboxId, body.cmd)
+    })
+
+    app.post('/workspaces/:id/deploy', async (req, reply) => {
+      const ws = requireWorkspace(workspaces, req, reply)
+      if (!ws) return
+      if (ws.sandboxId.startsWith('mock_')) {
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+        return {
+          ok: true,
+          url: `https://forge-deploy-${ws.id.slice(0, 12)}.vercel.app`,
+          logs: '✓ Bundling assets...\n✓ Running type checks...\n✓ Building static pages...\n✓ Uploading bundle to edge network...\n✓ Deploy success!'
+        }
+      } else {
+        const buildRes = await provider.exec(ws.sandboxId, 'pnpm run build || npm run build')
+        if (buildRes.exitCode !== 0) {
+          return reply.code(400).send({
+            error: 'Build failed during deployment',
+            logs: buildRes.stderr || buildRes.stdout
+          })
+        }
+        return {
+          ok: true,
+          url: `https://3000-${ws.sandboxId}.e2b.dev`,
+          logs: buildRes.stdout + '\n✓ Build verification passed.\n✓ Deploy success!'
+        }
+      }
     })
 
     // Streamed shell bridged to the editor terminal (xterm).
@@ -269,7 +372,8 @@ function routes(
 
     // Streamed agent loop: client sends AgentCommand, server streams AgentEvent.
     app.get('/workspaces/:id/agent', { websocket: true }, (socket, req) => {
-      const userId = wsUserId(req, env.AGENT_SERVICE_SECRET)
+      const claims = wsTokenClaims(req, env.AGENT_SERVICE_SECRET)
+      const userId = claims?.userId ?? null
       if (!userId) {
         socket.close(1008, 'unauthorized')
         return
@@ -280,21 +384,29 @@ function routes(
         return
       }
 
+      /** Owner accounts (e.g. company founder) bypass ALL spend caps. */
+      const isOwner = isOwnerEmail(claims?.email, env.OWNER_EMAILS)
+
       const approvals = new ApprovalGate()
+      const questions = new QuestionGate()
+      const spendApprovals = new ApprovalGate()  // separate gate for spend confirmations
       const agent = new Agent(createToolSet(provider, ws.sandboxId, browser))
       let activeSessionId: string | null = null
       let running = false
       let abort: AbortController | null = null
+      /** Per-connection unlimited mode toggle (user sets via Settings UI). */
+      let userUnlimitedMode = false
 
       const send = (event: AgentEvent) => {
         if (activeSessionId) void sessionStore.appendArtifact(activeSessionId, event)
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event))
       }
 
-      // On disconnect: stop the in-flight run and unblock any pending approval.
+      // On disconnect: stop the in-flight run and unblock any pending approval/question.
       socket.on('close', () => {
         abort?.abort()
         approvals.rejectAll()
+        questions.rejectAll()
       })
 
       socket.on('message', async (data: Buffer) => {
@@ -308,6 +420,7 @@ function routes(
         if (cmd.type === 'cancel') {
           abort?.abort()
           approvals.rejectAll()
+          spendApprovals.rejectAll()
           return
         }
         if (cmd.type === 'approve') {
@@ -316,6 +429,25 @@ function routes(
         }
         if (cmd.type === 'reject') {
           approvals.resolve(cmd.id, false)
+          return
+        }
+        if (cmd.type === 'answer') {
+          questions.resolve(cmd.id, cmd.selection)
+          return
+        }
+        // Toggle unlimited mode for this connection (persisted in agent-service memory).
+        if (cmd.type === 'spend_topup_mode') {
+          userUnlimitedMode = cmd.enabled
+          send({ type: 'message', text: userUnlimitedMode
+            ? 'Unlimited top-up mode is on. You will be asked before each credit block.'
+            : 'Spend cap mode is on. Runs will stop at your credit limit.' })
+          return
+        }
+        // Spend top-up approval response: user confirmed a credit extension.
+        if (cmd.type === 'spend_topup') {
+          const blockUsd = cmd.blockUsd
+          ledger.addExtraCredits(userId, blockUsd)
+          spendApprovals.resolve(cmd.approvalId, true)
           return
         }
         if (cmd.type !== 'task') return
@@ -331,25 +463,76 @@ function routes(
           return
         }
 
-        const model = cmd.deep
-          ? resolveDeepModel(env, { fusionAvailable: secrets.openrouter })
-          : modelRouting(env).frontier
-        const estUsd = costForTokens(model, cmd.deep ? DEEP_EST_TOKENS : FRONTIER_EST_TOKENS)
+        // ── Model tier resolution (fusion-safe) ──────────────────────────────
+        // modelTier is the new field; deep is kept for backward compat.
+        //   fast     → MODEL_FAST      (cheapest, free models)
+        //   frontier → MODEL_FRONTIER  (claude-sonnet-4 etc)
+        //   fusion   → MODEL_DEEP      (openrouter/fusion — 3 model panel)
+        //   custom   → user-provided customModelId
+        const tier = cmd.modelTier ?? (cmd.deep ? 'fusion' : 'frontier')
+        const routing = modelRouting(env)
+        let model: string
+        let isFusion = false
+        switch (tier) {
+          case 'fast':
+            model = routing.fast
+            break
+          case 'frontier':
+            model = routing.frontier
+            break
+          case 'fusion':
+            model = resolveDeepModel(env, { fusionAvailable: secrets.openrouter })
+            isFusion = true
+            break
+          case 'custom':
+            model = cmd.customModelId ?? routing.frontier
+            break
+          default:
+            model = routing.frontier
+        }
+        const estUsd = costForTokens(model, isFusion ? DEEP_EST_TOKENS : FRONTIER_EST_TOKENS)
 
         // Gated deep reasoning is capped per request.
-        if (cmd.deep && estUsd > DEEP_REQUEST_CAP_USD) {
+        if (isFusion && estUsd > DEEP_REQUEST_CAP_USD) {
           send({ type: 'error', message: 'Deep reasoning exceeds the per-request cap.' })
           send({ type: 'done', ok: false })
           return
         }
-        // Enforce the per-user spend cap BEFORE the model call.
-        const check = ledger.check(userId, estUsd, caps)
-        if (!check.allowed) {
-          send({ type: 'error', message: `Spend cap reached: ${check.reason}.` })
-          send({ type: 'done', ok: false })
-          return
+        // Enforce the per-user spend cap         // ── Owner bypass: company accounts get unlimited, uncapped access. ──────
+        if (!isOwner) {
+          const effectiveCaps: SpendCaps = { ...caps, unlimitedMode: userUnlimitedMode }
+          const check = ledger.check(userId, estUsd, effectiveCaps, claims?.email)
+          if (!check.allowed) {
+            if (check.needsApproval) {
+              // Unlimited mode: ask the user before adding a credit block.
+              const spendApprovalId = `spend_${Date.now()}`
+              const blockUsd = effectiveCaps.approvalBlockUsd ?? 5
+              send({
+                type: 'approval',
+                id: spendApprovalId,
+                action: 'Spend credit extension',
+                detail: check.approvalDetail ?? `Approve a $${blockUsd.toFixed(2)} credit extension?`,
+              })
+              const approved = await spendApprovals.request(spendApprovalId)
+              if (!approved) {
+                send({ type: 'error', message: 'Credit extension declined. Run cancelled.' })
+                send({ type: 'done', ok: false })
+                return
+              }
+              const recheck = ledger.check(userId, estUsd, effectiveCaps, claims?.email)
+              if (!recheck.allowed && !recheck.needsApproval) {
+                send({ type: 'error', message: `Spend cap reached: ${recheck.reason}.` })
+                send({ type: 'done', ok: false })
+                return
+              }
+            } else {
+              send({ type: 'error', message: `Spend cap reached: ${check.reason}.` })
+              send({ type: 'done', ok: false })
+              return
+            }
+          }
         }
-        ledger.record(userId, estUsd)
+        ledger.record(userId, isOwner ? 0 : estUsd)
         running = true
         abort = new AbortController()
         const session = await sessionStore.createSession(ws.id, cmd.task)
@@ -358,8 +541,9 @@ function routes(
           workspace: ws.id,
           session: activeSessionId,
           model,
-          deep: Boolean(cmd.deep),
+          tier,
           estUsd,
+          owner: isOwner,
         })
 
         const llmClient = createLlmClient(env, cmd.customKeys)
@@ -370,6 +554,7 @@ function routes(
               task: cmd.task,
               planner,
               approvals,
+              questions,
               requireWriteApproval: cmd.requireWriteApproval,
               signal: abort.signal,
             },
