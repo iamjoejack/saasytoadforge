@@ -1,7 +1,9 @@
 import type { SandboxProvider, ServerEnv } from '@forge/shared'
 import { MockSandboxProvider } from './mock-provider'
+import { E2BSandboxProvider } from './e2b-provider'
 
 export { MockSandboxProvider } from './mock-provider'
+export { E2BSandboxProvider } from './e2b-provider'
 
 /**
  * Resolves the configured SandboxProvider. Callers depend only on the interface, so
@@ -14,14 +16,11 @@ export { MockSandboxProvider } from './mock-provider'
 export function createSandboxProvider(env: ServerEnv): SandboxProvider {
   switch (env.SANDBOX_PROVIDER) {
     case 'e2b':
-      // HUMAN-INPUT NEEDED: E2B_API_KEY for real microVM sandboxes.
       if (!env.E2B_API_KEY) {
         console.warn('[sandbox] SANDBOX_PROVIDER=e2b but E2B_API_KEY missing; using mock provider')
         return new MockSandboxProvider()
       }
-      // TODO(phase1): return new E2BSandboxProvider(env.E2B_API_KEY)
-      console.warn('[sandbox] E2B provider not yet implemented; using mock provider')
-      return new MockSandboxProvider()
+      return new E2BSandboxProvider(env.E2B_API_KEY)
     case 'daytona':
       // TODO(phase1+): return new DaytonaSandboxProvider(env)
       console.warn('[sandbox] Daytona provider not yet implemented; using mock provider')

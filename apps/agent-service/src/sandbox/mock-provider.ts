@@ -9,6 +9,7 @@ import type {
   SandboxProvider,
 } from '@forge/shared'
 import { hostFromUrl, isDomainAllowed } from '../lib/egress'
+import { Pushable } from './pushable'
 
 /**
  * In-memory sandbox for development and tests. It models the workspace file system
@@ -121,42 +122,6 @@ function runCommand(files: Map<string, string>, egress: string[], cmd: string): 
 /** Terminals expect CRLF line endings; convert bare/Windows newlines to CRLF. */
 function toCRLF(text: string): string {
   return text.replace(/\r?\n/g, '\r\n')
-}
-
-/** Async stream that lets a producer push chunks to an `for await` consumer. */
-class Pushable<T> implements AsyncIterable<T> {
-  private readonly queue: T[] = []
-  private readonly waiters: Array<(r: IteratorResult<T>) => void> = []
-  private done = false
-
-  push(item: T): void {
-    const waiter = this.waiters.shift()
-    if (waiter) {
-      waiter({ value: item, done: false })
-    } else {
-      this.queue.push(item)
-    }
-  }
-
-  end(): void {
-    this.done = true
-    let waiter = this.waiters.shift()
-    while (waiter) {
-      waiter({ value: undefined, done: true } as IteratorResult<T>)
-      waiter = this.waiters.shift()
-    }
-  }
-
-  [Symbol.asyncIterator](): AsyncIterator<T> {
-    return {
-      next: (): Promise<IteratorResult<T>> => {
-        const queued = this.queue.shift()
-        if (queued !== undefined) return Promise.resolve({ value: queued, done: false })
-        if (this.done) return Promise.resolve({ value: undefined, done: true } as IteratorResult<T>)
-        return new Promise((resolve) => this.waiters.push(resolve))
-      },
-    }
-  }
 }
 
 export class MockSandboxProvider implements SandboxProvider {

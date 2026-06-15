@@ -24,6 +24,8 @@ export default defineConfig({
       port: 8787,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
+      // Keep the suite deterministic + free: force mocks even if .env has real keys.
+      env: { SANDBOX_PROVIDER: 'mock', OPENROUTER_API_KEY: '', E2B_API_KEY: '' },
     },
     {
       command: 'pnpm --filter @forge/web start',
