@@ -35,12 +35,15 @@ interface AgentStore {
   connected: boolean
   running: boolean
   requireWriteApproval: boolean
+  deep: boolean
+  spendUsd: number | null
   timeline: TimelineItem[]
   socket: WebSocket | null
 
   connect: (workspaceId: string) => void
   disconnect: () => void
   setRequireWriteApproval: (value: boolean) => void
+  setDeep: (value: boolean) => void
   runTask: (task: string) => void
   respond: (approvalId: string, approve: boolean) => void
   acceptEdit: (itemId: string) => void
@@ -56,6 +59,8 @@ export const useAgent = create<AgentStore>()((set, get) => ({
   connected: false,
   running: false,
   requireWriteApproval: false,
+  deep: false,
+  spendUsd: null,
   timeline: [],
   socket: null,
 
@@ -66,9 +71,16 @@ export const useAgent = create<AgentStore>()((set, get) => ({
     socket.onclose = () => set({ connected: false, running: false })
     socket.onmessage = (event) => {
       if (typeof event.data !== 'string') return
-      applyEvent(set, JSON.parse(event.data) as AgentEvent)
+      const parsed = JSON.parse(event.data) as AgentEvent
+      applyEvent(set, parsed)
+      if (parsed.type === 'done') {
+        void client
+          .getSpend(workspaceId)
+          .then((s) => set({ spendUsd: s.userUsd }))
+          .catch(() => {})
+      }
     }
-    set({ socket, workspaceId, timeline: [] })
+    set({ socket, workspaceId, timeline: [], spendUsd: null })
   },
 
   disconnect: () => {
@@ -77,14 +89,15 @@ export const useAgent = create<AgentStore>()((set, get) => ({
   },
 
   setRequireWriteApproval: (value) => set({ requireWriteApproval: value }),
+  setDeep: (value) => set({ deep: value }),
 
   runTask: (task) => {
-    const { socket, requireWriteApproval } = get()
+    const { socket, requireWriteApproval, deep } = get()
     set((s) => ({
       running: true,
       timeline: [...s.timeline, { id: nextId(), kind: 'message', role: 'user', text: task }],
     }))
-    send(socket, { type: 'task', task, requireWriteApproval })
+    send(socket, { type: 'task', task, requireWriteApproval, deep })
   },
 
   respond: (approvalId, approve) => {

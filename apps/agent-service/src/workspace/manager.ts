@@ -21,10 +21,18 @@ const STARTER_FILES: Readonly<Record<string, string>> = {
 export class WorkspaceManager {
   private readonly workspaces = new Map<string, Workspace>()
 
-  constructor(private readonly provider: SandboxProvider) {}
+  constructor(
+    private readonly provider: SandboxProvider,
+    private readonly egressAllowlist: string[] = [],
+  ) {}
 
   async create(): Promise<Workspace> {
-    const sandbox = await this.provider.create({ template: 'node', envAllowlist: [] })
+    const sandbox = await this.provider.create({
+      template: 'node',
+      envAllowlist: [],
+    })
+    // Default-deny egress; only the configured domains are reachable (mission section 6.2).
+    await this.provider.setEgressAllowlist(sandbox.id, this.egressAllowlist)
     for (const [path, contents] of Object.entries(STARTER_FILES)) {
       await this.provider.writeFile(sandbox.id, path, contents)
     }

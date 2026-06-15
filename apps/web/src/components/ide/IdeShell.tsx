@@ -31,7 +31,13 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
         <span className="font-mono text-xs text-zinc-500" title={workspaceId}>
           {workspaceId.slice(0, 14)}
         </span>
-        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-zinc-500">
+        <Link
+          href="/settings"
+          className="ml-auto text-xs text-zinc-400 transition hover:text-zinc-200"
+        >
+          settings
+        </Link>
+        <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           sandbox live
         </span>

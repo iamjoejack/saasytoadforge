@@ -32,9 +32,25 @@ export type AgentEvent =
 
 /** Client -> agent messages over the same socket. */
 export type AgentCommand =
-  | { type: 'task'; task: string; requireWriteApproval?: boolean }
+  | { type: 'task'; task: string; requireWriteApproval?: boolean; deep?: boolean }
   | { type: 'approve'; id: string }
   | { type: 'reject'; id: string }
+
+export interface ConfigSummary {
+  models: ModelRouting
+  sandboxProvider: string
+  egressAllowlist: string[]
+  caps: { perUserUsd: number; globalUsd: number }
+  secrets: { openrouter: boolean; e2b: boolean; supabase: boolean; stripe: boolean }
+}
+
+export interface SpendSummaryDto {
+  userUsd: number
+  globalUsd: number
+  caps: { perUserUsd: number; globalUsd: number }
+  userRemainingUsd: number
+  globalRemainingUsd: number
+}
 
 export interface ModelRouting {
   /** inline edits, routine steps */

@@ -103,6 +103,19 @@ describe('MockSandboxProvider', () => {
     await shell.close()
   })
 
+  it('enforces default-deny egress and honors the allowlist', async () => {
+    const { provider, sandbox } = await freshSandbox()
+    // Default: empty allowlist blocks everything.
+    expect((await provider.exec(sandbox.id, 'curl https://evil.example.com')).exitCode).not.toBe(0)
+
+    await provider.setEgressAllowlist(sandbox.id, ['registry.npmjs.org'])
+    const allowed = await provider.exec(sandbox.id, 'curl https://registry.npmjs.org/pkg')
+    expect(allowed.exitCode).toBe(0)
+    const blocked = await provider.exec(sandbox.id, 'curl https://evil.example.com')
+    expect(blocked.exitCode).not.toBe(0)
+    expect(blocked.stderr).toMatch(/egress blocked/)
+  })
+
   it('stores the egress allowlist and clears state on destroy', async () => {
     const { provider, sandbox } = await freshSandbox()
     await provider.setEgressAllowlist(sandbox.id, ['registry.npmjs.org', 'pypi.org'])

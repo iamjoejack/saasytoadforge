@@ -1,6 +1,6 @@
 # Forge Build Progress
 
-CURRENT TASK: Phase 3 COMPLETE on mocks (gate verified via Playwright; SECURITY.md review PASS). NEXT: Phase 4 - egress allowlist enforcement + test, spend ledger + caps + test, side-effect approval queue, token/$ dashboard, structured logging, Fusion-gated deep reasoning. (Real agent/sandbox pending OPENROUTER_API_KEY + E2B_API_KEY.)
+CURRENT TASK: Phase 4 COMPLETE on mocks (gate verified). NEXT: Phase 5 - Supabase auth + RLS, workspace/session/artifact persistence, Stripe scaffold, README, Vercel + Railway/Fly deploy configs, prod smoke test. STOPS for human approval before paid/prod deploy + live Stripe (needs SUPABASE_* + STRIPE_*).
 
 Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 
@@ -48,13 +48,13 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 - [x] GATE: multi-file UI task -> orchestrator decomposes -> bundle (plan, multi-file diff, test output, screenshot). Verified via Playwright + screenshot. SECURITY.md review of 6.1-6.3 = PASS.
 
 ## Phase 4 - Safety, cost, observability
-- [ ] egress allowlist enforcement + test
-- [ ] spend ledger + caps + test
-- [ ] side-effect approval queue
-- [ ] token/$ dashboard
-- [ ] structured logging (no secrets)
-- [ ] Fusion-gated deep-reasoning action
-- [ ] GATE: egress-block test, spend-cap test, approval pause/resume, per-session cost dashboard
+- [x] egress allowlist enforcement + test (lib/egress.ts, default-deny per sandbox via WorkspaceManager; curl/wget blocked unless allowlisted)
+- [x] spend ledger + caps + test (lib/spend.ts; enforced before each model call in the agent WS handler)
+- [x] side-effect approval queue (ApprovalGate + write-approval; pause/resume verified)
+- [x] token/$ dashboard (per-session cost in the Agent panel + /settings policy screen via /config + /spend)
+- [x] structured logging, no secrets (lib/logger.ts + redaction test; wired into agent runs)
+- [x] Fusion-gated deep-reasoning action (resolveDeepModel + per-request cap; UI "deep reasoning" toggle; degrades to frontier)
+- [x] GATE: egress-block test PASS, spend-cap test PASS, approval pause/resume PASS, per-session cost dashboard PASS. 68 unit/integration tests + 5 Playwright flows.
 
 ## Phase 5 - Auth, persistence, billing, ship
 - [ ] Supabase Auth + RLS

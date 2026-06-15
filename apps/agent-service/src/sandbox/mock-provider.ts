@@ -8,6 +8,7 @@ import type {
   Sandbox,
   SandboxProvider,
 } from '@forge/shared'
+import { hostFromUrl, isDomainAllowed } from '../lib/egress'
 
 /**
  * In-memory sandbox for development and tests. It models the workspace file system
@@ -31,7 +32,7 @@ function normalizePath(p: string): string {
 }
 
 /** Minimal deterministic shell over the in-memory file system. */
-function runCommand(files: Map<string, string>, cmd: string): ExecResult {
+function runCommand(files: Map<string, string>, egress: string[], cmd: string): ExecResult {
   const start = performance.now()
   const [bin = '', ...rest] = cmd.trim().split(/\s+/)
   let stdout = ''
@@ -92,6 +93,20 @@ function runCommand(files: Map<string, string>, cmd: string): ExecResult {
       } else {
         stderr = `[mock-sandbox] 'node' is simulated; only \`node --test <file>\` is supported\n`
         exitCode = 1
+      }
+      break
+    }
+    case 'curl':
+    case 'wget': {
+      // Egress is default-deny per sandbox (mission section 6.2). A non-allowlisted host
+      // is blocked; an allowlisted one is permitted (network itself is simulated here).
+      const target = rest.find((a) => /^https?:\/\//.test(a) || /\.[a-z]{2,}/i.test(a)) ?? ''
+      const host = hostFromUrl(target)
+      if (isDomainAllowed(host, egress)) {
+        stdout = `[mock-sandbox] egress allowed to ${host} (simulated)\n`
+      } else {
+        stderr = `[mock-sandbox] egress blocked: ${host || target} is not on the allowlist\n`
+        exitCode = 7
       }
       break
     }
@@ -161,7 +176,8 @@ export class MockSandboxProvider implements SandboxProvider {
   }
 
   async exec(id: string, cmd: string, _opts?: ExecOptions): Promise<ExecResult> {
-    return runCommand(this.state(id).files, cmd)
+    const state = this.state(id)
+    return runCommand(state.files, state.egress, cmd)
   }
 
   async writeFile(id: string, path: string, contents: string): Promise<void> {
@@ -212,7 +228,7 @@ export class MockSandboxProvider implements SandboxProvider {
 
     function runLine(): void {
       stream.push('\r\n')
-      const result = runCommand(state.files, lineBuffer)
+      const result = runCommand(state.files, state.egress, lineBuffer)
       lineBuffer = ''
       if (result.stdout) stream.push(toCRLF(result.stdout))
       if (result.stderr) stream.push(toCRLF(result.stderr))

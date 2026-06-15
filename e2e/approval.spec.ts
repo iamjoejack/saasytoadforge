@@ -7,7 +7,7 @@ test('write-approval gate pauses writes and resumes on approve', async ({ page }
   await page.waitForURL(/\/workspaces\/.+/)
   await expect(page.getByText('ready')).toBeVisible({ timeout: 10000 })
 
-  await page.getByLabel('require approval before each file write').check()
+  await page.getByLabel('approve writes').check()
   await page
     .getByPlaceholder('Describe a task')
     .fill('add a current time endpoint and a test for it')

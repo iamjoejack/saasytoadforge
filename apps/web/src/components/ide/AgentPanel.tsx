@@ -25,6 +25,9 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
   const respond = useAgent((s) => s.respond)
   const acceptEdit = useAgent((s) => s.acceptEdit)
   const rejectEdit = useAgent((s) => s.rejectEdit)
+  const deep = useAgent((s) => s.deep)
+  const setDeep = useAgent((s) => s.setDeep)
+  const spendUsd = useAgent((s) => s.spendUsd)
 
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -125,15 +128,31 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
       </div>
 
       <div className="border-t border-white/5 p-3">
-        <label className="mb-2 flex items-center gap-2 text-[11px] text-zinc-500">
-          <input
-            type="checkbox"
-            checked={requireWriteApproval}
-            onChange={(e) => setRequireWriteApproval(e.target.checked)}
-            className="accent-[var(--brass)]"
-          />
-          require approval before each file write
-        </label>
+        <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={requireWriteApproval}
+              onChange={(e) => setRequireWriteApproval(e.target.checked)}
+              className="accent-[var(--brass)]"
+            />
+            approve writes
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={deep}
+              onChange={(e) => setDeep(e.target.checked)}
+              className="accent-[var(--brass)]"
+            />
+            deep reasoning
+          </label>
+          {spendUsd !== null ? (
+            <span className="ml-auto tabular-nums text-zinc-500">
+              ${spendUsd.toFixed(4)} this session
+            </span>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2">
           <input
             value={input}

@@ -7,10 +7,13 @@ import cors from '@fastify/cors'
 import websocket from '@fastify/websocket'
 import {
   parseServerEnv,
+  parseEgressAllowlist,
+  secretStatus,
   type SandboxProvider,
   type ServerEnv,
   type AgentCommand,
   type AgentEvent,
+  type ConfigSummary,
 } from '@forge/shared'
 import { createSandboxProvider } from './sandbox'
 import { WorkspaceManager, type Workspace } from './workspace/manager'
@@ -19,10 +22,14 @@ import { Agent, ApprovalGate } from './agent/agent'
 import { createLlmClient } from './agent/llm'
 import { createPlanner } from './agent/planner'
 import { createToolSet, MockBrowserTool, type BrowserTool } from './agent/tools'
+import { SpendLedger, costForTokens, type SpendCaps } from './lib/spend'
+import { modelRouting, resolveDeepModel } from './agent/router'
+import { logger } from './lib/logger'
 
 export interface ServerDeps {
   provider: SandboxProvider
   browser: BrowserTool
+  ledger: SpendLedger
 }
 
 /**
@@ -38,12 +45,14 @@ export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
   // Mock browser (SVG preview) by default for the scaffold; PlaywrightBrowserTool is the
   // real drop-in used against the running app on E2B.
   const browser = deps?.browser ?? new MockBrowserTool()
-  const workspaces = new WorkspaceManager(provider)
+  const ledger = deps?.ledger ?? new SpendLedger()
+  const egressAllowlist = parseEgressAllowlist(env)
+  const workspaces = new WorkspaceManager(provider, egressAllowlist)
 
   const app = Fastify({ logger: false })
   void app.register(cors, { origin: true })
   void app.register(websocket)
-  void app.register(routes(provider, workspaces, env, browser))
+  void app.register(routes(provider, workspaces, env, browser, ledger))
 
   return app
 }
@@ -53,9 +62,22 @@ function routes(
   workspaces: WorkspaceManager,
   env: ServerEnv,
   browser: BrowserTool,
+  ledger: SpendLedger,
 ): FastifyPluginAsync {
+  const caps: SpendCaps = { perUserUsd: env.SPEND_CAP_USER_USD, globalUsd: env.SPEND_CAP_GLOBAL_USD }
+  const secrets = secretStatus(env)
+
   return async (app) => {
     app.get('/health', async () => ({ status: 'ok', service: 'agent-service' }))
+
+    // Non-secret configuration for the Settings screen (read-only display of policy).
+    app.get('/config', async (): Promise<ConfigSummary> => ({
+      models: modelRouting(env),
+      sandboxProvider: env.SANDBOX_PROVIDER,
+      egressAllowlist: parseEgressAllowlist(env),
+      caps: { perUserUsd: caps.perUserUsd, globalUsd: caps.globalUsd },
+      secrets,
+    }))
 
     app.post('/workspaces', async () => workspaces.create())
 
@@ -100,6 +122,12 @@ function routes(
         if (err instanceof PathError) return reply.code(400).send({ error: err.message })
         throw err
       }
+    })
+
+    app.get('/workspaces/:id/spend', async (req, reply) => {
+      const ws = requireWorkspace(workspaces, req.params, reply)
+      if (!ws) return
+      return ledger.summary(ws.id, caps)
     })
 
     app.post('/workspaces/:id/exec', async (req, reply) => {
@@ -157,6 +185,27 @@ function routes(
           return
         }
         if (cmd.type === 'task') {
+          // Deep reasoning (Fusion) is gated + capped, and degrades to frontier if absent.
+          const model = cmd.deep
+            ? resolveDeepModel(env, { fusionAvailable: secrets.openrouter })
+            : modelRouting(env).frontier
+          const estUsd = costForTokens(model, cmd.deep ? 9000 : 2300)
+
+          // Enforce spend caps BEFORE the model call; degrade gracefully when hit.
+          const check = ledger.check(ws.id, estUsd, caps)
+          if (!check.allowed) {
+            send({ type: 'error', message: `Spend cap reached: ${check.reason}.` })
+            send({ type: 'done', ok: false })
+            return
+          }
+          ledger.record(ws.id, estUsd)
+          logger.info('agent run', {
+            workspace: ws.id,
+            model,
+            deep: Boolean(cmd.deep),
+            estUsd,
+          })
+
           const planner = createPlanner(env, createLlmClient(env))
           void agent.run(
             {

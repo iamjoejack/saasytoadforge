@@ -44,4 +44,9 @@ Per-user and global caps enforced before each model call, backed by a Postgres l
 - Phase 2 (agent loop): edits/tests in-sandbox only; write-approval gate reviewed. PASS.
 - Phase 3 (subagents + tools): scoped `ToolSet` confirms no host fs / control-plane net /
   secret tools; browser tool is read-only render; 6.1-6.3 reviewed. PASS.
-- Phase 4 will add the egress-block test, the spend-cap test, and the full approval queue.
+- Phase 4 (safety/cost/observability): egress default-deny enforced per sandbox + blocked-egress
+  test; spend caps enforced before each model call + cap test; structured logging redacts secrets
+  + redaction test; Fusion deep tier gated, capped, and degrades to frontier. 6.2 / 6.4 / 6.5
+  reviewed. PASS.
+- Phase 5 will move the spend ledger + workspace/artifact state to Postgres (Supabase) with
+  row-level security, and add Stripe webhook signature verification.
