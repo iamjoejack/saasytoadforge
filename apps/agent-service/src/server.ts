@@ -1,17 +1,134 @@
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyPluginAsync,
+} from 'fastify'
+import cors from '@fastify/cors'
+import websocket from '@fastify/websocket'
+import { parseServerEnv, type SandboxProvider } from '@forge/shared'
+import { createSandboxProvider } from './sandbox'
+import { WorkspaceManager, type Workspace } from './workspace/manager'
+import { assertSafePath, PathError } from './lib/paths'
+
+export interface ServerDeps {
+  provider: SandboxProvider
+}
 
 /**
- * Builds the agent-service HTTP app. Kept as a factory so tests can drive it via
- * `app.inject` without binding a port. Websocket + agent-loop routes land in
- * later phases; Phase 0 ships a health surface only.
+ * Builds the agent-service app. A provider can be injected for deterministic tests;
+ * otherwise it is resolved from env (mock unless real sandbox credentials are present).
+ *
+ * Routes live in a nested plugin registered AFTER @fastify/websocket so that the
+ * plugin's onRoute hook is active when the `{ websocket: true }` routes are added.
  */
-export function buildServer(): FastifyInstance {
-  const app = Fastify({ logger: false })
+export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
+  const env = parseServerEnv()
+  const provider = deps?.provider ?? createSandboxProvider(env)
+  const workspaces = new WorkspaceManager(provider)
 
-  app.get('/health', async () => ({
-    status: 'ok',
-    service: 'agent-service',
-  }))
+  const app = Fastify({ logger: false })
+  void app.register(cors, { origin: true })
+  void app.register(websocket)
+  void app.register(routes(provider, workspaces))
 
   return app
+}
+
+function routes(provider: SandboxProvider, workspaces: WorkspaceManager): FastifyPluginAsync {
+  return async (app) => {
+    app.get('/health', async () => ({ status: 'ok', service: 'agent-service' }))
+
+    app.post('/workspaces', async () => workspaces.create())
+
+    app.get('/workspaces', async () => workspaces.list())
+
+    app.get('/workspaces/:id/files', async (req, reply) => {
+      const ws = requireWorkspace(workspaces, req.params, reply)
+      if (!ws) return
+      const dir = (req.query as { dir?: string }).dir ?? ''
+      return provider.listFiles(ws.sandboxId, dir)
+    })
+
+    app.get('/workspaces/:id/file', async (req, reply) => {
+      const ws = requireWorkspace(workspaces, req.params, reply)
+      if (!ws) return
+      const rawPath = (req.query as { path?: string }).path
+      if (typeof rawPath !== 'string') {
+        return reply.code(400).send({ error: 'path query param is required' })
+      }
+      try {
+        const path = assertSafePath(rawPath)
+        const contents = await provider.readFile(ws.sandboxId, path)
+        return { path, contents }
+      } catch (err) {
+        if (err instanceof PathError) return reply.code(400).send({ error: err.message })
+        return reply.code(404).send({ error: 'file not found' })
+      }
+    })
+
+    app.put('/workspaces/:id/file', async (req, reply) => {
+      const ws = requireWorkspace(workspaces, req.params, reply)
+      if (!ws) return
+      const body = req.body as { path?: unknown; contents?: unknown }
+      if (typeof body.path !== 'string' || typeof body.contents !== 'string') {
+        return reply.code(400).send({ error: 'path and contents must be strings' })
+      }
+      try {
+        const path = assertSafePath(body.path)
+        await provider.writeFile(ws.sandboxId, path, body.contents)
+        return { ok: true, path }
+      } catch (err) {
+        if (err instanceof PathError) return reply.code(400).send({ error: err.message })
+        throw err
+      }
+    })
+
+    app.post('/workspaces/:id/exec', async (req, reply) => {
+      const ws = requireWorkspace(workspaces, req.params, reply)
+      if (!ws) return
+      const body = req.body as { cmd?: unknown }
+      if (typeof body.cmd !== 'string') {
+        return reply.code(400).send({ error: 'cmd must be a string' })
+      }
+      return provider.exec(ws.sandboxId, body.cmd)
+    })
+
+    // Streamed shell bridged to the editor terminal (xterm).
+    app.get('/workspaces/:id/shell', { websocket: true }, (socket, req) => {
+      const ws = workspaces.get((req.params as { id: string }).id)
+      if (!ws) {
+        socket.close(1008, 'workspace not found')
+        return
+      }
+      const shell = provider.openShell(ws.sandboxId)
+
+      // Attach the message handler synchronously before starting async work.
+      socket.on('message', (data: Buffer) => {
+        void shell.write(data.toString())
+      })
+      socket.on('close', () => {
+        void shell.close()
+      })
+
+      void (async () => {
+        for await (const chunk of shell.output) {
+          if (socket.readyState === socket.OPEN) socket.send(chunk)
+        }
+      })()
+    })
+  }
+}
+
+function requireWorkspace(
+  workspaces: WorkspaceManager,
+  params: unknown,
+  reply: FastifyReply,
+): Workspace | undefined {
+  const id = (params as { id?: string }).id ?? ''
+  const ws = workspaces.get(id)
+  if (!ws) {
+    void reply.code(404).send({ error: 'workspace not found' })
+    return undefined
+  }
+  return ws
 }
