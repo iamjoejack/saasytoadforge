@@ -59,8 +59,9 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 ## Phase 5 - Auth, persistence, billing, ship  (scaffold ready; STOP boundary per 2.4)
 - [x] Auth flow works (dev provider): AuthProvider interface + DevAuthProvider (scrypt + cookie sessions) + sign-in/up page + middleware gate + sign-out. Supabase Auth is the drop-in. Verified via Playwright. (Supabase RLS schema written; real wiring pending SUPABASE_*.)
 - [~] workspace/session/artifact persistence - schema ready; repository swap-in pending SUPABASE_* (currently in-memory + in-process spend ledger)
-- [ ] Stripe subscription scaffold - pending STRIPE_* (STOP). No live charges without approval.
+- [x] Stripe subscription scaffold: BillingProvider interface + MockBillingProvider + flat PLANS (Solo/Pro/Agency, AI included never metered) + /billing/plans + /billing/checkout (mock, no charge) + /pricing page. Real StripeBillingProvider is the drop-in (pending STRIPE_*). No live charges.
 - [x] README (setup, env, architecture, security, deploy)
 - [x] Vercel + Fly/Railway deploy configs (vercel.json, Dockerfile, .dockerignore, fly.toml)
-- [ ] production smoke test - harness pending a deployed URL
-- [ ] GATE: STOP per 2.4 - needs SUPABASE_* + STRIPE_* (real secrets) and explicit approval for the first paid/prod deploy + live Stripe. Everything that does not cross that line is done.
+- [x] production smoke test (e2e/smoke.spec.ts: pricing -> sign up -> workspace -> task green; override baseURL to target a deployment)
+- [ ] Lighthouse perf >= 90 on the editor route - run at deploy against the real URL (editor is gated + lazy-loads Monaco)
+- [ ] GATE: STOP per 2.4 - real SUPABASE_* + STRIPE_* secrets, real Supabase auth/persistence wiring, live Stripe, and the first paid/prod deploy need explicit approval. Everything not crossing that line is done.

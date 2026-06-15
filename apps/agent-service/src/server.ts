@@ -25,6 +25,7 @@ import { createToolSet, MockBrowserTool, type BrowserTool } from './agent/tools'
 import { SpendLedger, costForTokens, type SpendCaps } from './lib/spend'
 import { modelRouting, resolveDeepModel } from './agent/router'
 import { logger } from './lib/logger'
+import { createBillingProvider } from './billing/billing'
 
 export interface ServerDeps {
   provider: SandboxProvider
@@ -66,6 +67,7 @@ function routes(
 ): FastifyPluginAsync {
   const caps: SpendCaps = { perUserUsd: env.SPEND_CAP_USER_USD, globalUsd: env.SPEND_CAP_GLOBAL_USD }
   const secrets = secretStatus(env)
+  const billing = createBillingProvider(env)
 
   return async (app) => {
     app.get('/health', async () => ({ status: 'ok', service: 'agent-service' }))
@@ -78,6 +80,17 @@ function routes(
       caps: { perUserUsd: caps.perUserUsd, globalUsd: caps.globalUsd },
       secrets,
     }))
+
+    app.get('/billing/plans', async () => billing.plans())
+
+    app.post('/billing/checkout', async (req, reply) => {
+      const body = req.body as { planId?: unknown; email?: unknown }
+      if (typeof body.planId !== 'string') {
+        return reply.code(400).send({ error: 'planId is required' })
+      }
+      const email = typeof body.email === 'string' ? body.email : 'unknown@forge.dev'
+      return billing.createCheckout(body.planId, { customerEmail: email })
+    })
 
     app.post('/workspaces', async () => workspaces.create())
 
