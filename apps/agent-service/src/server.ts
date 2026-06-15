@@ -18,9 +18,11 @@ import { assertSafePath, PathError } from './lib/paths'
 import { Agent, ApprovalGate } from './agent/agent'
 import { createLlmClient } from './agent/llm'
 import { createPlanner } from './agent/planner'
+import { createToolSet, PlaywrightBrowserTool, type BrowserTool } from './agent/tools'
 
 export interface ServerDeps {
   provider: SandboxProvider
+  browser: BrowserTool
 }
 
 /**
@@ -33,12 +35,13 @@ export interface ServerDeps {
 export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
   const env = parseServerEnv()
   const provider = deps?.provider ?? createSandboxProvider(env)
+  const browser = deps?.browser ?? new PlaywrightBrowserTool()
   const workspaces = new WorkspaceManager(provider)
 
   const app = Fastify({ logger: false })
   void app.register(cors, { origin: true })
   void app.register(websocket)
-  void app.register(routes(provider, workspaces, env))
+  void app.register(routes(provider, workspaces, env, browser))
 
   return app
 }
@@ -47,6 +50,7 @@ function routes(
   provider: SandboxProvider,
   workspaces: WorkspaceManager,
   env: ServerEnv,
+  browser: BrowserTool,
 ): FastifyPluginAsync {
   return async (app) => {
     app.get('/health', async () => ({ status: 'ok', service: 'agent-service' }))
@@ -138,7 +142,7 @@ function routes(
         return
       }
       const approvals = new ApprovalGate()
-      const agent = new Agent(provider, ws.sandboxId)
+      const agent = new Agent(createToolSet(provider, ws.sandboxId, browser))
       const send = (event: AgentEvent) => {
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event))
       }

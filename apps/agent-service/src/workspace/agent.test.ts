@@ -4,10 +4,11 @@ import { WebSocket } from 'ws'
 import type { AgentEvent } from '@forge/shared'
 import { buildServer } from '../server'
 import { MockSandboxProvider } from '../sandbox'
+import { MockBrowserTool } from '../agent/tools'
 
 describe('agent websocket', () => {
   it('runs the canonical task and streams plan, edits, terminal, done', async () => {
-    const server = buildServer({ provider: new MockSandboxProvider() })
+    const server = buildServer({ provider: new MockSandboxProvider(), browser: new MockBrowserTool() })
     await server.listen({ port: 0, host: '127.0.0.1' })
     const { port } = server.server.address() as AddressInfo
     const id = (await server.inject({ method: 'POST', url: '/workspaces' })).json<{ id: string }>().id

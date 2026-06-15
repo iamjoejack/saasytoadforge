@@ -1,5 +1,6 @@
-import type { AgentEvent, PlanStepStatus, SandboxProvider } from '@forge/shared'
+import type { AgentEvent, PlanStepStatus } from '@forge/shared'
 import type { Planner } from './planner'
+import type { ToolSet } from './tools'
 import { unifiedDiff } from './diff'
 
 /** Lets the loop pause on actions that need explicit user approval (mission section 6.3). */
@@ -30,15 +31,13 @@ export interface AgentRunOptions {
 export type Emit = (event: AgentEvent) => void
 
 /**
- * The single-agent loop: ask the planner for actions, then apply them against the
- * sandbox, streaming artifacts (plan, diffs, terminal output) as events. Reads, edits,
- * and test runs proceed freely; side-effecting actions wait on the approval gate.
+ * The agent loop: ask the planner for actions, then apply them through the scoped tool
+ * surface (filesystem / terminal / browser), streaming artifacts (plan, diffs, terminal
+ * output, screenshots) as events tagged with the acting subagent. Reads, edits, and test
+ * runs proceed freely; side-effecting actions wait on the approval gate.
  */
 export class Agent {
-  constructor(
-    private readonly provider: SandboxProvider,
-    private readonly sandboxId: string,
-  ) {}
+  constructor(private readonly tools: ToolSet) {}
 
   async run(opts: AgentRunOptions, emit: Emit): Promise<{ ok: boolean }> {
     const setStep = (id: string | undefined, status: PlanStepStatus) => {
@@ -52,13 +51,18 @@ export class Agent {
       for (const action of actions) {
         switch (action.kind) {
           case 'message':
-            emit({ type: 'message', text: action.text })
+            emit({ type: 'message', text: action.text, agent: action.agent })
             break
 
           case 'plan':
             emit({
               type: 'plan',
-              steps: action.steps.map((s) => ({ ...s, status: 'pending' as const })),
+              steps: action.steps.map((s) => ({
+                id: s.id,
+                title: s.title,
+                role: s.role,
+                status: 'pending' as const,
+              })),
             })
             break
 
@@ -76,15 +80,17 @@ export class Agent {
             setStep(action.stepId, 'running')
             let before = ''
             try {
-              before = await this.provider.readFile(this.sandboxId, action.path)
+              before = await this.tools.fs.read(action.path)
             } catch {
               before = ''
             }
-            await this.provider.writeFile(this.sandboxId, action.path, action.contents)
+            await this.tools.fs.write(action.path, action.contents)
             emit({
               type: 'edit',
               path: action.path,
               diff: unifiedDiff(action.path, before, action.contents),
+              before,
+              agent: action.agent,
             })
             setStep(action.stepId, 'done')
             break
@@ -92,9 +98,10 @@ export class Agent {
 
           case 'run': {
             setStep(action.stepId, 'running')
-            const result = await this.provider.exec(this.sandboxId, action.cmd)
+            const result = await this.tools.terminal.exec(action.cmd)
             emit({
               type: 'terminal',
+              agent: action.agent,
               result: {
                 cmd: action.cmd,
                 stdout: result.stdout,
@@ -105,6 +112,20 @@ export class Agent {
             const passed = result.exitCode === 0
             setStep(action.stepId, passed ? 'done' : 'failed')
             if (!passed) ok = false
+            break
+          }
+
+          case 'screenshot': {
+            setStep(action.stepId, 'running')
+            let html = ''
+            try {
+              html = await this.tools.fs.read(action.path)
+            } catch {
+              html = ''
+            }
+            const shot = await this.tools.browser.screenshot(html, action.label)
+            emit({ type: 'screenshot', label: shot.label, image: shot.image, agent: action.agent })
+            setStep(action.stepId, 'done')
             break
           }
 
