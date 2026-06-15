@@ -73,6 +73,28 @@ function runCommand(files: Map<string, string>, cmd: string): ExecResult {
       }
       break
     }
+    case 'node': {
+      // SIMULATION ONLY: the mock does not execute JS. It reports a passing test run
+      // when `node --test <file>` references a real, non-empty test file, so the agent
+      // loop and artifacts can be exercised. Real execution happens on E2B/Daytona.
+      if (rest[0] === '--test') {
+        const testPath = normalizePath(rest[1] ?? '')
+        const contents = files.get(testPath)
+        if (contents && contents.trim().length > 0) {
+          stdout =
+            'TAP version 13\n' +
+            'ok 1 - test passed (simulated by mock sandbox)\n' +
+            '1..1\n# tests 1\n# pass 1\n# fail 0\n'
+        } else {
+          stderr = `node: could not find test file '${rest[1] ?? ''}'\n`
+          exitCode = 1
+        }
+      } else {
+        stderr = `[mock-sandbox] 'node' is simulated; only \`node --test <file>\` is supported\n`
+        exitCode = 1
+      }
+      break
+    }
     default:
       stderr = `[mock-sandbox] '${bin}' is not executable in the mock provider; use E2B/Daytona for real execution\n`
       exitCode = 127

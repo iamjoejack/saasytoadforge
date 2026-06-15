@@ -27,13 +27,17 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 - [ ] E2B SandboxProvider impl behind the interface (HUMAN-INPUT: E2B_API_KEY; mock fallback wired) - deferred, not gating
 - [x] GATE: open workspace -> sandbox boots -> edit persists -> shell streams back. Proven: vitest API round-trip + WS shell + Playwright UI e2e (Monaco edit persists to sandbox, terminal command streams). Screenshot verified.
 
-## Phase 2 - Single-agent loop
-- [ ] Agent-Runtime service (OpenRouter streaming)
-- [ ] plan -> edit -> run loop
-- [ ] chat UI
-- [ ] plan + diff + terminal output as artifacts
-- [ ] write-approval toggle
-- [ ] GATE: "add an endpoint returning current time + a test" -> plan, edits, green test, artifacts (Playwright flow)
+## Phase 2 - Single-agent loop  (scaffolded on mocks per user choice)
+- [x] LlmClient interface + MockLlmClient + OpenRouterLlmClient (streaming, key-gated) + ModelRouter
+- [x] Planner: MockPlanner (scripted) + LlmPlanner (parses structured actions; tested via fake LLM) + factory
+- [x] plan -> edit -> run loop (Agent) with unified-diff artifacts + ApprovalGate
+- [x] write-approval toggle (server side: requireWriteApproval pauses each write)
+- [x] agent websocket endpoint /workspaces/:id/agent (AgentCommand in, AgentEvent out)
+- [x] mock sandbox simulated test runner (node --test) - labeled simulation; real run needs E2B
+- [x] backend tests: diff, agent loop (+approval pause/reject), planner, llm, agent-WS (37 agent-service tests)
+- [ ] chat UI + artifact viewer (plan steps, diff, terminal) in the Agent panel
+- [ ] Playwright flow for the canonical task (on mock)
+- [ ] GATE: "add an endpoint returning current time + a test" -> plan, edits, green test, artifacts. (Verified on mock; real test execution pending E2B_API_KEY.)
 
 ## Phase 3 - Subagents + tools + artifacts UI
 - [ ] Orchestrator + Coder + Verifier + Browser subagents

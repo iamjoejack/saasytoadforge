@@ -5,10 +5,19 @@ import Fastify, {
 } from 'fastify'
 import cors from '@fastify/cors'
 import websocket from '@fastify/websocket'
-import { parseServerEnv, type SandboxProvider } from '@forge/shared'
+import {
+  parseServerEnv,
+  type SandboxProvider,
+  type ServerEnv,
+  type AgentCommand,
+  type AgentEvent,
+} from '@forge/shared'
 import { createSandboxProvider } from './sandbox'
 import { WorkspaceManager, type Workspace } from './workspace/manager'
 import { assertSafePath, PathError } from './lib/paths'
+import { Agent, ApprovalGate } from './agent/agent'
+import { createLlmClient } from './agent/llm'
+import { createPlanner } from './agent/planner'
 
 export interface ServerDeps {
   provider: SandboxProvider
@@ -29,12 +38,16 @@ export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
   const app = Fastify({ logger: false })
   void app.register(cors, { origin: true })
   void app.register(websocket)
-  void app.register(routes(provider, workspaces))
+  void app.register(routes(provider, workspaces, env))
 
   return app
 }
 
-function routes(provider: SandboxProvider, workspaces: WorkspaceManager): FastifyPluginAsync {
+function routes(
+  provider: SandboxProvider,
+  workspaces: WorkspaceManager,
+  env: ServerEnv,
+): FastifyPluginAsync {
   return async (app) => {
     app.get('/health', async () => ({ status: 'ok', service: 'agent-service' }))
 
@@ -115,6 +128,45 @@ function routes(provider: SandboxProvider, workspaces: WorkspaceManager): Fastif
           if (socket.readyState === socket.OPEN) socket.send(chunk)
         }
       })()
+    })
+
+    // Streamed agent loop: client sends AgentCommand, server streams AgentEvent.
+    app.get('/workspaces/:id/agent', { websocket: true }, (socket, req) => {
+      const ws = workspaces.get((req.params as { id: string }).id)
+      if (!ws) {
+        socket.close(1008, 'workspace not found')
+        return
+      }
+      const approvals = new ApprovalGate()
+      const agent = new Agent(provider, ws.sandboxId)
+      const send = (event: AgentEvent) => {
+        if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event))
+      }
+
+      socket.on('message', (data: Buffer) => {
+        let cmd: AgentCommand
+        try {
+          cmd = JSON.parse(data.toString()) as AgentCommand
+        } catch {
+          return
+        }
+        if (cmd.type === 'task') {
+          const planner = createPlanner(env, createLlmClient(env))
+          void agent.run(
+            {
+              task: cmd.task,
+              planner,
+              approvals,
+              requireWriteApproval: cmd.requireWriteApproval,
+            },
+            send,
+          )
+        } else if (cmd.type === 'approve') {
+          approvals.resolve(cmd.id, true)
+        } else if (cmd.type === 'reject') {
+          approvals.resolve(cmd.id, false)
+        }
+      })
     })
   }
 }
