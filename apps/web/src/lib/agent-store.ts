@@ -124,11 +124,27 @@ export const useAgent = create<AgentStore>()((set, get) => ({
 
   runTask: (task) => {
     const { socket, requireWriteApproval, deep } = get()
+    
+    // Load custom developer keys from secure local storage
+    let customKeys: { anthropic?: string; google?: string } | undefined = undefined
+    try {
+      const saved = localStorage.getItem('forge:custom_keys')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        customKeys = {
+          anthropic: parsed.anthropic || undefined,
+          google: parsed.google || undefined,
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     set((s) => ({
       running: true,
       timeline: [...s.timeline, { id: nextId(), kind: 'message', role: 'user', text: task }],
     }))
-    send(socket, { type: 'task', task, requireWriteApproval, deep })
+    send(socket, { type: 'task', task, requireWriteApproval, deep, customKeys })
   },
 
   respond: (approvalId, approve) => {

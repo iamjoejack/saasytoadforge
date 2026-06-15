@@ -23,6 +23,8 @@ export const serverEnvSchema = z.object({
 
   // Shared secret for web <-> agent-service signed tokens.
   AGENT_SERVICE_SECRET: z.string().default(DEFAULT_AGENT_SERVICE_SECRET),
+  /** Comma-separated list of admin emails. */
+  ADMIN_EMAILS: z.string().default('admin@forge.dev'),
   /** Allowed browser origin(s) for CORS + websocket, comma-separated. Empty = localhost dev. */
   ALLOWED_ORIGINS: z.string().default(''),
 
@@ -92,4 +94,11 @@ export function parseEgressAllowlist(env: ServerEnv): string[] {
   return env.EGRESS_ALLOWLIST.split(',')
     .map((d) => d.trim())
     .filter((d) => d.length > 0)
+}
+
+/** Check if the user email is an authorized administrator. */
+export function isAdminEmail(email: string | undefined, adminEmailsStr: string): boolean {
+  if (!email) return false
+  const admins = adminEmailsStr.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+  return admins.includes(email.toLowerCase())
 }

@@ -11,5 +11,5 @@ export async function GET() {
   if (process.env.NODE_ENV === 'production' && secret === DEFAULT_AGENT_SERVICE_SECRET) {
     return NextResponse.json({ error: 'server misconfigured: AGENT_SERVICE_SECRET' }, { status: 500 })
   }
-  return NextResponse.json({ token: mintAgentToken(user.id, secret) })
+  return NextResponse.json({ token: mintAgentToken(user.id, secret, 3600, Date.now(), user.email) })
 }

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&display=swap');
 @import 'tailwindcss';
 
 :root {
@@ -26,6 +27,7 @@ body {
     radial-gradient(at 0% 0%, rgba(181, 106, 58, 0.05) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(200, 162, 74, 0.05) 0px, transparent 50%);
   background-attachment: fixed;
+  position: relative;
 }
 
 /* Custom premium scrollbar for Apple-like styling */
@@ -42,6 +44,84 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+/* Background blueprint drafting grid */
+.circuit-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: 
+    linear-gradient(rgba(200, 162, 74, 0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200, 162, 74, 0.012) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse 60% 50% at 50% 0%, black, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 0%, black, transparent 80%);
+  z-index: 0;
+}
+
+/* Steampunk Cinzel Serif Font Heading */
+.font-cinzel {
+  font-family: 'Cinzel', ui-serif, Georgia, Cambria, serif;
+  letter-spacing: -0.02em;
+}
+
+/* Steampunk riveted panel corners */
+.riveted {
+  position: relative;
+}
+.riveted::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--copper);
+  box-shadow: 0 0 1px rgba(0,0,0,0.8), inset 0 0.5px 0.5px rgba(255,255,255,0.4);
+  z-index: 10;
+}
+.riveted::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--copper);
+  box-shadow: 0 0 1px rgba(0,0,0,0.8), inset 0 0.5px 0.5px rgba(255,255,255,0.4);
+  z-index: 10;
+}
+
+/* Bottom corner rivets using helper markers inside the div */
+.rivet-bottom {
+  position: relative;
+}
+.rivet-bottom::before {
+  content: '';
+  position: absolute;
+  bottom: 7px;
+  left: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--copper);
+  box-shadow: 0 0 1px rgba(0,0,0,0.8), inset 0 0.5px 0.5px rgba(255,255,255,0.4);
+  z-index: 10;
+}
+.rivet-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: 7px;
+  right: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--copper);
+  box-shadow: 0 0 1px rgba(0,0,0,0.8), inset 0 0.5px 0.5px rgba(255,255,255,0.4);
+  z-index: 10;
 }
 
 /* Animations */
@@ -75,11 +155,6 @@ body {
     box-shadow: 0 0 25px rgba(200, 162, 74, 0.2), 0 0 8px rgba(200, 162, 74, 0.08);
     border-color: rgba(200, 162, 74, 0.5);
   }
-}
-
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 /* Custom premium classes */

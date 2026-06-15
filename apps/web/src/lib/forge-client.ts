@@ -135,3 +135,12 @@ export async function getPlans(): Promise<Plan[]> {
   return asJson(await fetch(`${BASE}/billing/plans`))
 }
 
+export async function getAdminStats(): Promise<{
+  workspaces: Workspace[]
+  globalSpend: number
+  caps: { perUserUsd: number; globalUsd: number }
+  users: Array<{ userId: string; usd: number }>
+}> {
+  return authed('/admin/stats')
+}
+

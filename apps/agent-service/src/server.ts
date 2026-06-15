@@ -35,6 +35,7 @@ import { SupabaseSessionStore } from './persistence/supabase-store'
 declare module 'fastify' {
   interface FastifyRequest {
     userId?: string
+    userEmail?: string
   }
 }
 
@@ -119,9 +120,24 @@ function routes(
         return reply.code(401).send({ error: 'unauthorized' })
       }
       req.userId = claims.userId
+      req.userEmail = claims.email
     })
 
     app.get('/health', async () => ({ status: 'ok', service: 'agent-service' }))
+
+    app.get('/admin/stats', async (req, reply) => {
+      const email = req.userEmail
+      const { isAdminEmail } = await import('@forge/shared')
+      if (!isAdminEmail(email, env.ADMIN_EMAILS)) {
+        return reply.code(403).send({ error: 'forbidden' })
+      }
+      return {
+        workspaces: workspaces.listAll(),
+        globalSpend: ledger.globalSpend(),
+        caps,
+        users: ledger.allSpends(),
+      }
+    })
 
     app.get('/config', async (): Promise<ConfigSummary> => ({
       models: modelRouting(env),
@@ -346,7 +362,8 @@ function routes(
           estUsd,
         })
 
-        const planner = createPlanner(env, createLlmClient(env))
+        const llmClient = createLlmClient(env, cmd.customKeys)
+        const planner = createPlanner(env, llmClient)
         void agent
           .run(
             {

@@ -57,6 +57,10 @@ export class WorkspaceManager {
     return [...this.workspaces.values()].filter((w) => w.owner === owner)
   }
 
+  listAll(): Workspace[] {
+    return [...this.workspaces.values()]
+  }
+
   async destroy(id: string, owner: string): Promise<boolean> {
     const workspace = this.get(id, owner)
     if (!workspace) return false

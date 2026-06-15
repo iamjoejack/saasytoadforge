@@ -9,6 +9,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 export interface TokenClaims {
   userId: string
   exp: number
+  email?: string
 }
 
 function sign(payload: string, secret: string): string {
@@ -20,8 +21,9 @@ export function mintAgentToken(
   secret: string,
   ttlSeconds = 3600,
   nowMs: number = Date.now(),
+  email?: string,
 ): string {
-  const claims: TokenClaims = { userId, exp: Math.floor(nowMs / 1000) + ttlSeconds }
+  const claims: TokenClaims = { userId, exp: Math.floor(nowMs / 1000) + ttlSeconds, email }
   const payload = Buffer.from(JSON.stringify(claims)).toString('base64url')
   return `${payload}.${sign(payload, secret)}`
 }

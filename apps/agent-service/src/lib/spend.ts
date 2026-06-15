@@ -51,6 +51,10 @@ export class SpendLedger {
     return this.total
   }
 
+  allSpends(): Array<{ userId: string; usd: number }> {
+    return [...this.perUser.entries()].map(([userId, usd]) => ({ userId, usd }))
+  }
+
   check(userId: string, estUsd: number, caps: SpendCaps): SpendCheck {
     if (this.userSpend(userId) + estUsd > caps.perUserUsd) {
       return { allowed: false, reason: 'per-user spend cap reached' }
