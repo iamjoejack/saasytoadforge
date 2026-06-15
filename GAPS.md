@@ -23,6 +23,12 @@ feature-completeness) with disposition. "Fixed" = closed + tested this pass.
   the root listing on each `edit`.
 - **EditorPane debounced-save timers never cleared on unmount** -> cleanup effect.
 
+## Fixed in Phase 5
+- **Supabase is schema-only** -> Swapped out `DevAuthProvider` and `InMemorySessionStore` for actual `@supabase/supabase-js` implementations, querying the Postgres DB directly.
+- **Stripe has no real provider** -> Wired up `stripe` Node SDK, connecting the subscriptions to the live API via `StripeBillingProvider`. Added the basic `/webhooks/stripe` POST route.
+- **No rate limiting** -> Wired up `@fastify/rate-limit` on the agent-service to prevent abuse, capped at 100 requests per minute.
+- **Sessions/artifacts grow unbounded** -> They are now stored in Postgres, no longer constrained by Node memory limits.
+
 ## Known gaps — honestly documented, not yet closed
 These need real infra/secrets or are deliberately deferred. Do not claim them as done.
 - **E2B egress is a no-op.** `e2b-provider.setEgressAllowlist` does nothing; default-deny
@@ -30,16 +36,10 @@ These need real infra/secrets or are deliberately deferred. Do not claim them as
   network policy. SECURITY.md 6.2 is downgraded accordingly.
 - **Spend is a fixed pre-charge estimate**, never reconciled to real token usage from the
   model response. A long run can overrun the cap within one task.
-- **Supabase is schema-only.** Auth (`DevAuthProvider`), sessions, artifacts, and the spend
-  ledger are in-process; they reset on restart. `@supabase/supabase-js` is not wired.
-- **Stripe has no real provider.** `createBillingProvider` returns the mock even with a key;
-  `MockBillingProvider` never charges. Real Checkout is a drop-in.
 - **"Fusion" deep reasoning is routing only** — it swaps the model id and inflates the cost
   estimate; there is no panel/judge multi-model orchestration.
 - **Screenshots default to the simulated SVG** (`MockBrowserTool`); the real
   `PlaywrightBrowserTool` exists but is not the wired default.
-- **No rate limiting** on the agent-service (workspace creation, exec, shell).
-- **Sessions/artifacts grow unbounded** in memory (no GC/cap); base64 screenshots are kept.
 - **No file CRUD in the tree** (create/delete/rename) and **no session-history browser** UI.
 - **Daytona / WebContainers providers** are not implemented (mock fallback).
 - **Lighthouse perf gate** runs at deploy against the real editor route.

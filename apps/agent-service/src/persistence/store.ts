@@ -13,9 +13,9 @@ export interface StoredSession {
 }
 
 export interface SessionStore {
-  createSession(workspaceId: string, task: string): StoredSession
-  appendArtifact(sessionId: string, event: AgentEvent): void
-  listSessions(workspaceId: string): StoredSession[]
+  createSession(workspaceId: string, task: string): Promise<StoredSession>
+  appendArtifact(sessionId: string, event: AgentEvent): Promise<void>
+  listSessions(workspaceId: string): Promise<StoredSession[]>
   readonly kind: 'memory' | 'supabase'
 }
 
@@ -27,7 +27,7 @@ export class InMemorySessionStore implements SessionStore {
   readonly kind = 'memory' as const
   private readonly sessions = new Map<string, StoredSession>()
 
-  createSession(workspaceId: string, task: string): StoredSession {
+  async createSession(workspaceId: string, task: string): Promise<StoredSession> {
     const session: StoredSession = {
       id: randomUUID(),
       workspaceId,
@@ -39,12 +39,12 @@ export class InMemorySessionStore implements SessionStore {
     return session
   }
 
-  appendArtifact(sessionId: string, event: AgentEvent): void {
+  async appendArtifact(sessionId: string, event: AgentEvent): Promise<void> {
     if (!PERSISTED.has(event.type)) return
     this.sessions.get(sessionId)?.artifacts.push(event)
   }
 
-  listSessions(workspaceId: string): StoredSession[] {
+  async listSessions(workspaceId: string): Promise<StoredSession[]> {
     return [...this.sessions.values()].filter((s) => s.workspaceId === workspaceId)
   }
 }

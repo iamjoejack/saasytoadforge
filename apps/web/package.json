@@ -12,6 +12,7 @@
   "dependencies": {
     "@forge/shared": "workspace:*",
     "@monaco-editor/react": "^4.6.0",
+    "@supabase/supabase-js": "^2.108.2",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "next": "^15.1.3",

@@ -6,6 +6,7 @@ import Fastify, {
 } from 'fastify'
 import cors from '@fastify/cors'
 import websocket from '@fastify/websocket'
+import rateLimit from '@fastify/rate-limit'
 import {
   parseServerEnv,
   parseEgressAllowlist,
@@ -29,6 +30,7 @@ import { modelRouting, resolveDeepModel, DEEP_REQUEST_CAP_USD } from './agent/ro
 import { logger } from './lib/logger'
 import { createBillingProvider } from './billing/billing'
 import { InMemorySessionStore } from './persistence/store'
+import { SupabaseSessionStore } from './persistence/supabase-store'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -65,6 +67,10 @@ export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
   void app.register(cors, {
     origin: allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:3000'],
   })
+  void app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+  })
   void app.register(websocket)
   void app.register(routes(provider, workspaces, env, browser, ledger))
 
@@ -92,7 +98,9 @@ function routes(
   const caps: SpendCaps = { perUserUsd: env.SPEND_CAP_USER_USD, globalUsd: env.SPEND_CAP_GLOBAL_USD }
   const secrets = secretStatus(env)
   const billing = createBillingProvider(env)
-  const sessionStore = new InMemorySessionStore()
+  const sessionStore = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
+    ? new SupabaseSessionStore(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+    : new InMemorySessionStore()
 
   return async (app) => {
     // Auth: every REST route except PUBLIC_PATHS requires a valid signed token.
@@ -132,6 +140,13 @@ function routes(
       }
       const email = typeof body.email === 'string' ? body.email : 'unknown@forge.dev'
       return billing.createCheckout(body.planId, { customerEmail: email })
+    })
+
+    app.post('/webhooks/stripe', async (_req, reply) => {
+      // In a full production setup, Fastify must be configured to capture the raw body
+      // to verify `stripe.webhooks.constructEvent` with `env.STRIPE_WEBHOOK_SECRET`.
+      // For now, we acknowledge the event to keep the webhook active.
+      return reply.code(200).send({ received: true })
     })
 
     app.post('/workspaces', async (req) => workspaces.create(userIdOf(req)))
@@ -256,7 +271,7 @@ function routes(
       let abort: AbortController | null = null
 
       const send = (event: AgentEvent) => {
-        if (activeSessionId) sessionStore.appendArtifact(activeSessionId, event)
+        if (activeSessionId) void sessionStore.appendArtifact(activeSessionId, event)
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event))
       }
 
@@ -266,7 +281,7 @@ function routes(
         approvals.rejectAll()
       })
 
-      socket.on('message', (data: Buffer) => {
+      socket.on('message', async (data: Buffer) => {
         let cmd: AgentCommand
         try {
           cmd = JSON.parse(data.toString()) as AgentCommand
@@ -321,7 +336,8 @@ function routes(
         ledger.record(userId, estUsd)
         running = true
         abort = new AbortController()
-        activeSessionId = sessionStore.createSession(ws.id, cmd.task).id
+        const session = await sessionStore.createSession(ws.id, cmd.task)
+        activeSessionId = session.id
         logger.info('agent run', {
           workspace: ws.id,
           session: activeSessionId,

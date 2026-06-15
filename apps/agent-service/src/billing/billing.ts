@@ -53,8 +53,11 @@ export class MockBillingProvider implements BillingProvider {
   }
 }
 
-export function createBillingProvider(_env: ServerEnv): BillingProvider {
-  // Always the mock today: a real StripeBillingProvider (live Checkout, no charge without
-  // explicit approval) is the documented drop-in. See GAPS.md. No live charges ever happen here.
+import { StripeBillingProvider } from './stripe-billing'
+
+export function createBillingProvider(env: ServerEnv): BillingProvider {
+  if (env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET) {
+    return new StripeBillingProvider(env.STRIPE_SECRET_KEY)
+  }
   return new MockBillingProvider()
 }
