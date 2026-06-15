@@ -27,9 +27,35 @@ export function isOwner(email: string | null | undefined): boolean {
   return ownerEmails().includes(email.trim().toLowerCase())
 }
 
+export interface LoginOptions {
+  /** Required for first-time owner setup when OWNER_SETUP_SECRET is configured. */
+  setupSecret?: string
+}
+
+/**
+ * Owner first-login is bootstrap: the first person to log in with an owner email sets its
+ * password. To stop someone from squatting an owner email before the real owner sets up,
+ * set OWNER_SETUP_SECRET; first-time owner creation then requires it. Existing accounts
+ * always verify their password and ignore the setup secret.
+ */
+function ownerBootstrapBlocked(opts?: LoginOptions): string | null {
+  const required = process.env.OWNER_SETUP_SECRET
+  if (required) {
+    return opts?.setupSecret === required
+      ? null
+      : 'First-time owner setup requires the setup code. Ask the company for OWNER_SETUP_SECRET.'
+  }
+  // Fail closed in production: never let a public owner email self-provision an owner
+  // without an out-of-band proof. Owners must set OWNER_SETUP_SECRET or be seeded.
+  if (process.env.NODE_ENV === 'production') {
+    return 'Owner setup is locked. Set OWNER_SETUP_SECRET or provision the owner out of band.'
+  }
+  return null
+}
+
 export interface AdminStore {
   /** Verify owner/admin credentials. Owners are created on first login with their chosen password. */
-  login(email: string, password: string): Promise<LoginResult>
+  login(email: string, password: string, opts?: LoginOptions): Promise<LoginResult>
   listAdmins(): Promise<AdminRecord[]>
   createAdmin(email: string, password: string, permissions: AreaKey[]): Promise<AdminRecord>
   removeAdmin(id: string): Promise<void>
@@ -77,21 +103,27 @@ export class SupabaseAdminStore implements AdminStore {
     return data.users.find((u) => (u.email ?? '').toLowerCase() === target) ?? null
   }
 
-  async login(email: string, password: string): Promise<LoginResult> {
+  async login(email: string, password: string, opts?: LoginOptions): Promise<LoginResult> {
     const owner = isOwner(email)
     const existing = await this.findByEmail(email)
 
     if (!existing) {
-      if (!owner) return { ok: false, error: 'No admin account for that email.' }
+      // Uniform message for non-owner unknown emails (no account-enumeration oracle).
+      if (!owner) return { ok: false, error: 'Invalid email or password.' }
+      const blocked = ownerBootstrapBlocked(opts)
+      if (blocked) return { ok: false, error: blocked }
       if (password.length < MIN_PASSWORD) return { ok: false, error: `Password must be at least ${MIN_PASSWORD} characters.` }
-      // First-time owner setup: create the owner with the chosen password.
+      // First-time owner setup: create the owner, stamping the explicit owner role.
       const { error } = await this.service.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
         app_metadata: { forge_role: 'owner' },
       })
-      if (error) return { ok: false, error: error.message }
+      if (error) {
+        console.error('owner bootstrap failed:', error.message)
+        return { ok: false, error: 'Could not complete owner setup.' }
+      }
       return { ok: true, email: email.toLowerCase(), role: 'owner', permissions: [...ALL_AREAS] }
     }
 
@@ -100,10 +132,17 @@ export class SupabaseAdminStore implements AdminStore {
     const { error: signInError } = await anon.auth.signInWithPassword({ email, password })
     if (signInError) return { ok: false, error: 'Invalid email or password.' }
 
-    if (owner) return { ok: true, email: email.toLowerCase(), role: 'owner', permissions: [...ALL_AREAS] }
-
     const role = (existing.app_metadata as { forge_role?: string } | null)?.forge_role
-    if (role !== 'admin') return { ok: false, error: 'This account is not an admin.' }
+    if (owner) {
+      // Owner status requires the explicit forge_role stamp set only by bootstrap, not mere
+      // membership in the public owner-email list. This blocks owner-email squatting through
+      // the shared customer signup pool.
+      if (role !== 'owner') {
+        return { ok: false, error: 'This account is not provisioned as an owner. Contact the company.' }
+      }
+      return { ok: true, email: email.toLowerCase(), role: 'owner', permissions: [...ALL_AREAS] }
+    }
+    if (role !== 'admin') return { ok: false, error: 'This account does not have back-office access.' }
     const perms = sanitizeAreas((existing.app_metadata as { forge_permissions?: unknown }).forge_permissions)
     return { ok: true, email: (existing.email ?? email).toLowerCase(), role: 'admin', permissions: perms }
   }
@@ -132,7 +171,10 @@ export class SupabaseAdminStore implements AdminStore {
       email_confirm: true,
       app_metadata: { forge_role: 'admin', forge_permissions: sanitizeAreas(permissions) },
     })
-    if (error || !data.user) throw new Error(error?.message ?? 'Could not create admin.')
+    if (error || !data.user) {
+      console.error('createAdmin failed:', error?.message)
+      throw new Error('Could not create admin.')
+    }
     return {
       id: data.user.id,
       email: data.user.email ?? email,
@@ -144,16 +186,35 @@ export class SupabaseAdminStore implements AdminStore {
 
   async removeAdmin(id: string): Promise<void> {
     const { data } = await this.service.auth.admin.getUserById(id)
-    if (data.user && isOwner(data.user.email)) throw new Error('Owners cannot be removed.')
+    if (!data.user) throw new Error('Admin not found.')
+    if (isOwner(data.user.email)) throw new Error('Owners cannot be removed.')
+    // Only remove accounts that are actually forge admins, never arbitrary users.
+    if ((data.user.app_metadata as { forge_role?: string } | null)?.forge_role !== 'admin') {
+      throw new Error('That account is not an admin.')
+    }
     const { error } = await this.service.auth.admin.deleteUser(id)
-    if (error) throw new Error(error.message)
+    if (error) {
+      console.error('removeAdmin failed:', error.message)
+      throw new Error('Could not remove admin.')
+    }
   }
 
   async setPermissions(id: string, permissions: AreaKey[]): Promise<AdminRecord> {
+    // Guard the target: never let a permission change mint an admin out of an arbitrary
+    // user id (e.g. a customer). The target must already be a forge admin, never an owner.
+    const { data: cur } = await this.service.auth.admin.getUserById(id)
+    if (!cur.user) throw new Error('Admin not found.')
+    if (isOwner(cur.user.email)) throw new Error('Owners cannot be modified here.')
+    if ((cur.user.app_metadata as { forge_role?: string } | null)?.forge_role !== 'admin') {
+      throw new Error('That account is not an admin.')
+    }
     const { data, error } = await this.service.auth.admin.updateUserById(id, {
       app_metadata: { forge_role: 'admin', forge_permissions: sanitizeAreas(permissions) },
     })
-    if (error || !data.user) throw new Error(error?.message ?? 'Could not update permissions.')
+    if (error || !data.user) {
+      console.error('setPermissions failed:', error?.message)
+      throw new Error('Could not update permissions.')
+    }
     return {
       id: data.user.id,
       email: data.user.email ?? '',
@@ -172,12 +233,14 @@ export class InMemoryAdminStore implements AdminStore {
     { id: string; email: string; role: AdminRole; permissions: AreaKey[]; passwordHash: string; createdAt: string }
   >()
 
-  async login(email: string, password: string): Promise<LoginResult> {
+  async login(email: string, password: string, opts?: LoginOptions): Promise<LoginResult> {
     const key = email.trim().toLowerCase()
     const owner = isOwner(email)
     const existing = this.byEmail.get(key)
     if (!existing) {
-      if (!owner) return { ok: false, error: 'No admin account for that email.' }
+      if (!owner) return { ok: false, error: 'Invalid email or password.' }
+      const blocked = ownerBootstrapBlocked(opts)
+      if (blocked) return { ok: false, error: blocked }
       if (password.length < MIN_PASSWORD) return { ok: false, error: `Password must be at least ${MIN_PASSWORD} characters.` }
       this.byEmail.set(key, {
         id: crypto.randomUUID(),
@@ -190,9 +253,15 @@ export class InMemoryAdminStore implements AdminStore {
       return { ok: true, email: key, role: 'owner', permissions: [...ALL_AREAS] }
     }
     if (!verifyPassword(password, existing.passwordHash)) return { ok: false, error: 'Invalid email or password.' }
-    const role: AdminRole = owner ? 'owner' : existing.role
-    if (!owner && role !== 'admin') return { ok: false, error: 'This account is not an admin.' }
-    return { ok: true, email: key, role, permissions: owner ? [...ALL_AREAS] : existing.permissions }
+    if (owner) {
+      // Owner requires the explicit stored owner role, not just an owner-listed email.
+      if (existing.role !== 'owner') {
+        return { ok: false, error: 'This account is not provisioned as an owner. Contact the company.' }
+      }
+      return { ok: true, email: key, role: 'owner', permissions: [...ALL_AREAS] }
+    }
+    if (existing.role !== 'admin') return { ok: false, error: 'This account does not have back-office access.' }
+    return { ok: true, email: key, role: 'admin', permissions: existing.permissions }
   }
 
   async listAdmins(): Promise<AdminRecord[]> {

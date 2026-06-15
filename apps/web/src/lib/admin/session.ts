@@ -16,17 +16,25 @@ export interface AdminClaims {
   exp: number
 }
 
+const DEV_KEY = 'forge-admin-dev-insecure-secret-change-in-prod'
+
 /**
- * Signing key for admin session cookies. Prefer an explicit secret; otherwise derive a
- * stable secret from the Supabase service role key (server-only, high entropy). The final
- * fallback is for local dev only and is clearly insecure.
+ * Signing key for admin session cookies. Prefer a dedicated ADMIN_SESSION_SECRET. Otherwise
+ * derive a domain-separated key from another server-only secret, so a leak of the agent-token
+ * secret does NOT also forge admin cookies (the label keeps the two key spaces distinct).
+ * Fails closed in production when no real secret is available; the dev literal is dev-only.
  */
 function signingKey(): string {
-  const explicit = process.env.ADMIN_SESSION_SECRET || process.env.AGENT_SERVICE_SECRET
+  const explicit = process.env.ADMIN_SESSION_SECRET
   if (explicit) return explicit
+  const agentSecret = process.env.AGENT_SERVICE_SECRET
+  if (agentSecret) return crypto.createHash('sha256').update(`forge-admin-session:${agentSecret}`).digest('hex')
   const svc = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (svc) return crypto.createHash('sha256').update(`forge-admin:${svc}`).digest('hex')
-  return 'forge-admin-dev-insecure-secret-change-in-prod'
+  if (svc) return crypto.createHash('sha256').update(`forge-admin-session:${svc}`).digest('hex')
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('ADMIN_SESSION_SECRET must be set in production; refusing to sign admin sessions with a public key.')
+  }
+  return DEV_KEY
 }
 
 function hmac(payload: string): string {
@@ -52,9 +60,10 @@ export function verifyAdminSession(token: string | undefined | null): AdminClaim
   if (dot <= 0) return null
   const payload = token.slice(0, dot)
   const sig = token.slice(dot + 1)
-  if (!safeEqual(sig, hmac(payload))) return null
   let claims: AdminClaims
   try {
+    // signingKey() throws in a misconfigured production deploy; treat that as no session.
+    if (!safeEqual(sig, hmac(payload))) return null
     claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as AdminClaims
   } catch {
     return null

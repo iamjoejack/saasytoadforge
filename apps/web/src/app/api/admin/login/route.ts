@@ -3,16 +3,21 @@ import { getAdminStore } from '@/lib/admin/store'
 import { ADMIN_COOKIE, ADMIN_SESSION_TTL_MS, signAdminSession } from '@/lib/admin/session'
 
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => ({}))) as { email?: unknown; password?: unknown }
+  const body = (await req.json().catch(() => ({}))) as {
+    email?: unknown
+    password?: unknown
+    setupSecret?: unknown
+  }
   const email = typeof body.email === 'string' ? body.email.trim() : ''
   const password = typeof body.password === 'string' ? body.password : ''
+  const setupSecret = typeof body.setupSecret === 'string' ? body.setupSecret : undefined
   if (!email || !password) {
     return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
   }
 
   let result
   try {
-    result = await getAdminStore().login(email, password)
+    result = await getAdminStore().login(email, password, { setupSecret })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Login failed.' }, { status: 500 })
   }

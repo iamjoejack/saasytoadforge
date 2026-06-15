@@ -113,9 +113,52 @@ describe('InMemoryAdminStore', () => {
     expect(await store.listAdmins()).toHaveLength(0)
   })
 
+  it('gates owner first-login behind OWNER_SETUP_SECRET when set', async () => {
+    process.env.OWNER_SETUP_SECRET = 'launch-code'
+    const store = new InMemoryAdminStore()
+    const blocked = await store.login('owner@forge.dev', 'ownerpass1')
+    expect(blocked.ok).toBe(false)
+    const ok = await store.login('owner@forge.dev', 'ownerpass1', { setupSecret: 'launch-code' })
+    expect(ok.ok && ok.role).toBe('owner')
+    delete process.env.OWNER_SETUP_SECRET
+  })
+
   it('knows who is an owner', () => {
     expect(isOwner('owner@forge.dev')).toBe(true)
     expect(isOwner('OWNER@FORGE.DEV')).toBe(true)
     expect(isOwner('nope@forge.dev')).toBe(false)
+  })
+
+  it('returns the same error for unknown email and wrong password (no enumeration)', async () => {
+    const store = new InMemoryAdminStore()
+    await store.login('owner@forge.dev', 'ownerpass1')
+    await store.createAdmin('helper@forge.dev', 'helperpass1', ['billing'])
+    const unknown = await store.login('ghost@forge.dev', 'whatever1')
+    const wrongPw = await store.login('helper@forge.dev', 'wrongpass1')
+    expect(unknown.ok).toBe(false)
+    expect(wrongPw.ok).toBe(false)
+    expect(unknown.ok === false && unknown.error).toBe('Invalid email or password.')
+    expect(wrongPw.ok === false && wrongPw.error).toBe('Invalid email or password.')
+  })
+
+  it('locks owner bootstrap in production when OWNER_SETUP_SECRET is unset', async () => {
+    const prev = process.env.NODE_ENV
+    // @ts-expect-error NODE_ENV is writable in the test runner
+    process.env.NODE_ENV = 'production'
+    delete process.env.OWNER_SETUP_SECRET
+    try {
+      const store = new InMemoryAdminStore()
+      const r = await store.login('owner@forge.dev', 'ownerpass1')
+      expect(r.ok).toBe(false)
+    } finally {
+      // @ts-expect-error restore
+      process.env.NODE_ENV = prev
+    }
+  })
+
+  it('setPermissions rejects an unknown target id', async () => {
+    const store = new InMemoryAdminStore()
+    await store.login('owner@forge.dev', 'ownerpass1')
+    await expect(store.setPermissions('does-not-exist', ['billing'])).rejects.toThrow()
   })
 })
