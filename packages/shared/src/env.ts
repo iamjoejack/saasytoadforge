@@ -19,6 +19,8 @@ export const serverEnvSchema = z.object({
   OPENROUTER_API_KEY: z.string().optional(),
   /** Server-side Anthropic key; when set, Claude drives the agent directly (no OpenRouter). */
   ANTHROPIC_API_KEY: z.string().optional(),
+  /** Server-side Google Gemini key; used as a model fallback after OpenRouter. */
+  GEMINI_API_KEY: z.string().optional(),
   E2B_API_KEY: z.string().optional(),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_ANON_KEY: z.string().optional(),

@@ -4,8 +4,14 @@
 **/coverage
 **/playwright-report
 **/test-results
+**/.turbo
 .git
 .github
+.vercel
 *.log
 .env
 .env.*
+**/.env
+**/.env.local
+**/.env.*.local
+!**/.env.example

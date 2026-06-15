@@ -134,11 +134,24 @@ export class SupabaseAdminStore implements AdminStore {
 
     const role = (existing.app_metadata as { forge_role?: string } | null)?.forge_role
     if (owner) {
-      // Owner status requires the explicit forge_role stamp set only by bootstrap, not mere
-      // membership in the public owner-email list. This blocks owner-email squatting through
+      // Owner status requires the explicit forge_role stamp set only by bootstrap/reclaim, not
+      // mere membership in the public owner-email list. This blocks owner-email squatting through
       // the shared customer signup pool.
       if (role !== 'owner') {
-        return { ok: false, error: 'This account is not provisioned as an owner. Contact the company.' }
+        // Reclaim: an owner-email account that exists without the owner stamp (e.g. created
+        // earlier as a customer) can be promoted, but only with the same proof bootstrap
+        // requires (OWNER_SETUP_SECRET, or dev). The password was already verified above, so a
+        // squatter without the setup code cannot reach this.
+        const blocked = ownerBootstrapBlocked(opts)
+        if (blocked) return { ok: false, error: blocked }
+        const meta = (existing.app_metadata as Record<string, unknown> | null) ?? {}
+        const { error: upErr } = await this.service.auth.admin.updateUserById(existing.id, {
+          app_metadata: { ...meta, forge_role: 'owner' },
+        })
+        if (upErr) {
+          console.error('owner reclaim failed:', upErr.message)
+          return { ok: false, error: 'Could not complete owner setup.' }
+        }
       }
       return { ok: true, email: email.toLowerCase(), role: 'owner', permissions: [...ALL_AREAS] }
     }
@@ -255,8 +268,12 @@ export class InMemoryAdminStore implements AdminStore {
     if (!verifyPassword(password, existing.passwordHash)) return { ok: false, error: 'Invalid email or password.' }
     if (owner) {
       // Owner requires the explicit stored owner role, not just an owner-listed email.
+      // Reclaim an owner-email account lacking the role with the same proof bootstrap needs.
       if (existing.role !== 'owner') {
-        return { ok: false, error: 'This account is not provisioned as an owner. Contact the company.' }
+        const blocked = ownerBootstrapBlocked(opts)
+        if (blocked) return { ok: false, error: blocked }
+        existing.role = 'owner'
+        existing.permissions = [...ALL_AREAS]
       }
       return { ok: true, email: key, role: 'owner', permissions: [...ALL_AREAS] }
     }

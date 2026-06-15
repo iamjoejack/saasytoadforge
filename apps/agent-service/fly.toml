@@ -1,0 +1,35 @@
+# Fly.io config for the SaaSyToad Forge agent-service.
+#
+# Deploy from the REPO ROOT so the build context includes packages/shared:
+#   fly launch --no-deploy --config apps/agent-service/fly.toml   # first time, pick an app name
+#   fly secrets set OPENROUTER_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+#     STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... AGENT_SERVICE_SECRET=... \
+#     ALLOWED_ORIGINS=https://your-forge-web.vercel.app E2B_API_KEY=... --config apps/agent-service/fly.toml
+#   fly deploy --config apps/agent-service/fly.toml
+#
+# Then set NEXT_PUBLIC_AGENT_SERVICE_URL in the Forge web (Vercel) project to this app's URL.
+
+app = "saasytoad-forge-agent"   # change to your own unique app name
+primary_region = "iad"
+
+[build]
+  dockerfile = "apps/agent-service/Dockerfile"   # relative to the repo-root build context
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  # Keep at least one machine warm so websocket sessions are not cold-started.
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

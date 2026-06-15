@@ -396,36 +396,60 @@ const STATUSES = [
 
 function ProductTab() {
   const [status, setStatus] = useState<string>('coming-soon')
+  const [saving, setSaving] = useState(false)
+  const [note, setNote] = useState('')
+
   useEffect(() => {
-    try {
-      setStatus(localStorage.getItem('forge:product_status') ?? 'coming-soon')
-    } catch {
-      // ignore
-    }
+    fetch('/api/product-status')
+      .then((r) => r.json())
+      .then((d: { status?: string }) => {
+        if (d.status) setStatus(d.status)
+      })
+      .catch(() => {})
   }, [])
-  function choose(s: string) {
+
+  async function choose(s: string) {
+    const prev = status
     setStatus(s)
+    setSaving(true)
+    setNote('')
     try {
-      localStorage.setItem('forge:product_status', s)
+      const r = await fetch('/api/product-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: s }),
+      })
+      if (r.ok) {
+        setNote('Saved. The marketing site shows this within a few minutes.')
+      } else {
+        setStatus(prev)
+        setNote('Could not save. You need owner access or the product area.')
+      }
     } catch {
-      // ignore
+      setStatus(prev)
+      setNote('Could not reach the server.')
+    } finally {
+      setSaving(false)
     }
   }
+
   return (
     <div className="space-y-6">
       <section className="glass-panel p-5 rounded-xl">
         <h2 className="font-cinzel text-sm font-bold text-zinc-200 mb-1">Forge launch status</h2>
         <p className="text-[11px] text-zinc-550 mb-4 leading-relaxed">
-          Set how Forge is presented on the marketing site. This is the intended status; it appears on the marketing site on its next deploy.
+          Set how Forge is presented on the marketing site. This saves to the live product config
+          and the marketing site picks it up automatically.
         </p>
         <div className="flex flex-wrap gap-2">
           {STATUSES.map((s) => (
             <button
               key={s.key}
               type="button"
-              onClick={() => choose(s.key)}
+              disabled={saving}
+              onClick={() => void choose(s.key)}
               className={cn(
-                'rounded-lg border px-3 py-1.5 text-xs font-semibold transition cursor-pointer',
+                'rounded-lg border px-3 py-1.5 text-xs font-semibold transition cursor-pointer disabled:opacity-50',
                 status === s.key ? 'border-[var(--brass)]/40 bg-[var(--brass)]/10 text-[var(--brass)]' : 'border-white/10 text-zinc-400 hover:text-zinc-200',
               )}
             >
@@ -434,8 +458,8 @@ function ProductTab() {
           ))}
         </div>
         <p className="mt-4 text-[11px] text-zinc-550">
-          Current selection: <span className="text-zinc-300 font-semibold">{STATUSES.find((s) => s.key === status)?.label}</span>.
-          The marketing site reads this from its product config; flip it there and redeploy to publish.
+          Current status: <span className="text-zinc-300 font-semibold">{STATUSES.find((s) => s.key === status)?.label}</span>.
+          {note && <span className="ml-1 text-emerald-400">{note}</span>}
         </p>
       </section>
     </div>

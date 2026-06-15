@@ -368,5 +368,7 @@ export function createLlmClient(
   // A server-side Anthropic key drives Claude directly (no OpenRouter needed).
   if (env.ANTHROPIC_API_KEY) return new AnthropicLlmClient(env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL)
   if (env.OPENROUTER_API_KEY) return new OpenRouterLlmClient(env.OPENROUTER_API_KEY)
+  // Server-side Gemini fallback when no OpenRouter/Anthropic key is configured.
+  if (env.GEMINI_API_KEY) return new GeminiLlmClient(env.GEMINI_API_KEY, env.GOOGLE_MODEL)
   return new MockLlmClient()
 }

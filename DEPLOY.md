@@ -4,8 +4,47 @@ This is a pnpm monorepo with two apps:
 
 - `apps/web` — the Next.js front end. **This is what Vercel deploys.**
 - `apps/agent-service` — a long-running Fastify WebSocket server. **Vercel cannot host this**
-  (it is not serverless). Run it on Railway, Fly, Render, or a VM, and point the web app at it
-  via `NEXT_PUBLIC_AGENT_SERVICE_URL`.
+  (it is not serverless). Run it on Railway, Fly, Render, or a VM via the included Dockerfile,
+  and point the web app at it via `NEXT_PUBLIC_AGENT_SERVICE_URL`.
+
+## Hosting the agent-service (Docker)
+
+`apps/agent-service/Dockerfile` builds the server. The build context MUST be the repo root
+(it needs `packages/shared` and the workspace lockfile). It runs on port `8787` and exposes
+`/health`.
+
+Local sanity check:
+
+```
+docker build -f apps/agent-service/Dockerfile -t forge-agent .
+docker run -p 8787:8787 --env-file apps/agent-service/.env forge-agent
+# then: curl http://localhost:8787/health  ->  {"status":"ok","service":"agent-service"}
+```
+
+### Fly.io
+
+```
+fly launch --no-deploy --config apps/agent-service/fly.toml   # pick a unique app name
+fly secrets set OPENROUTER_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... AGENT_SERVICE_SECRET=... E2B_API_KEY=... \
+  ALLOWED_ORIGINS=https://YOUR-forge-web.vercel.app --config apps/agent-service/fly.toml
+fly deploy --config apps/agent-service/fly.toml
+```
+
+Run these from the repo root so the Docker context is correct.
+
+### Railway / Render
+
+- **Root Directory: the repo root** (NOT `apps/agent-service` — the build needs `packages/shared`).
+- **Dockerfile path:** `apps/agent-service/Dockerfile`.
+- **Health check path:** `/health`. **Port:** `8787`.
+- Add the same env vars as above as service variables.
+
+### After it is hosted
+
+1. Set `NEXT_PUBLIC_AGENT_SERVICE_URL` in the Forge web (Vercel) project to the agent-service URL.
+2. Set `ALLOWED_ORIGINS` on the agent-service to the Forge web origin (CORS + websocket).
+3. Use the SAME `AGENT_SERVICE_SECRET` on both the web app and the agent-service.
 
 ## Vercel: pick ONE root-directory pattern
 
