@@ -56,11 +56,11 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 - [x] Fusion-gated deep-reasoning action (resolveDeepModel + per-request cap; UI "deep reasoning" toggle; degrades to frontier)
 - [x] GATE: egress-block test PASS, spend-cap test PASS, approval pause/resume PASS, per-session cost dashboard PASS. 68 unit/integration tests + 5 Playwright flows.
 
-## Phase 5 - Auth, persistence, billing, ship
-- [ ] Supabase Auth + RLS
-- [ ] workspace/session/artifact persistence
-- [ ] Stripe subscription scaffold (no live charge without approval)
-- [ ] README (setup, env, architecture, security model)
-- [ ] Vercel + Railway/Fly deploy configs
-- [ ] production smoke test
-- [ ] GATE: full DoD; deploy succeeds; smoke green. STOP for human approval before paid/prod deploy + live Stripe.
+## Phase 5 - Auth, persistence, billing, ship  (scaffold ready; STOP boundary per 2.4)
+- [~] Supabase Auth + RLS - schema + RLS policies written (supabase/migrations/0001_init.sql); auth wiring pending SUPABASE_* (STOP)
+- [~] workspace/session/artifact persistence - schema ready; repository swap-in pending SUPABASE_* (currently in-memory + in-process spend ledger)
+- [ ] Stripe subscription scaffold - pending STRIPE_* (STOP). No live charges without approval.
+- [x] README (setup, env, architecture, security, deploy)
+- [x] Vercel + Fly/Railway deploy configs (vercel.json, Dockerfile, .dockerignore, fly.toml)
+- [ ] production smoke test - harness pending a deployed URL
+- [ ] GATE: STOP per 2.4 - needs SUPABASE_* + STRIPE_* (real secrets) and explicit approval for the first paid/prod deploy + live Stripe. Everything that does not cross that line is done.

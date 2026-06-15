@@ -25,6 +25,9 @@ marked and mirrored with a `// HUMAN-INPUT NEEDED` comment in code.
 | 2026-06-15 | Visual verification via Playwright headless (Bash), not the preview MCP | The session's preview MCP is bound to a different repo; Playwright is the mission-mandated mechanism anyway | `pnpm exec playwright test` + screenshot artifact | No |
 | 2026-06-15 | E2E not in the default CI job | Needs both servers + a browser download; runs as its own step (playwright webServer self-starts them) | separate from lint/test/build | No |
 
+| 2026-06-15 | Phase 5 stops at the deploy/secret boundary | Mission 2.4: real secrets + irreversible prod deploy require human approval | scaffold (schema, deploy configs, README) built; no deploy, no live Stripe, no real auth wiring | Yes - SUPABASE_* + STRIPE_* and prod-deploy approval |
+| 2026-06-15 | Auth built directly on Supabase (no throwaway local auth) | Cleaner than building local cookie-auth then replacing it; persistence is in-memory until keys arrive | Supabase Auth + RLS (schema ready) | Yes - SUPABASE_* |
+
 ## Open human inputs (surface at each phase boundary)
 - OPENROUTER_API_KEY - needed for real agent calls (Phase 2). Mocked until then.
 - E2B_API_KEY - needed for real sandboxes (Phase 1). Mock provider until then.
