@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { authenticate } from './helpers'
+
+test.beforeEach(async ({ page }) => {
+  await authenticate(page)
+})
 
 /**
  * Phase 2 gate through the real Agent panel: the canonical task produces a plan,

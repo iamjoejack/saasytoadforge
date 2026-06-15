@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { authenticate } from './helpers'
+
+test.beforeEach(async ({ page }) => {
+  await authenticate(page)
+})
 
 /** Phase 4: the Settings screen shows the enforced policy, and per-session cost is visible. */
 test('settings shows policy and the agent panel shows per-session cost', async ({ page }) => {

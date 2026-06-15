@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { authenticate } from './helpers'
+
+test.beforeEach(async ({ page }) => {
+  await authenticate(page)
+})
 
 /** Write-approval gate: each file write pauses until the user approves it. */
 test('write-approval gate pauses writes and resumes on approve', async ({ page }) => {

@@ -12,6 +12,7 @@ export default function WorkspacesPage() {
   const [items, setItems] = useState<Workspace[] | null>(null)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [email, setEmail] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -19,10 +20,20 @@ export default function WorkspacesPage() {
       .listWorkspaces()
       .then((ws) => active && setItems(ws))
       .catch(() => active && setItems([]))
+    fetch('/api/auth/session')
+      .then((r) => r.json())
+      .then((d: { user?: { email: string } | null }) => active && setEmail(d.user?.email ?? null))
+      .catch(() => {})
     return () => {
       active = false
     }
   }, [])
+
+  async function signOut() {
+    await fetch('/api/auth/signout', { method: 'POST' })
+    router.push('/signin')
+    router.refresh()
+  }
 
   async function create() {
     setCreating(true)
@@ -38,6 +49,21 @@ export default function WorkspacesPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col px-6 py-16">
+      <div className="mb-6 flex items-center justify-between text-xs text-zinc-500">
+        <span className="inline-flex items-center gap-2">
+          <Link href="/settings" className="transition hover:text-zinc-300">
+            settings
+          </Link>
+        </span>
+        {email ? (
+          <span className="inline-flex items-center gap-3">
+            <span>signed in as {email}</span>
+            <button type="button" onClick={() => void signOut()} className="transition hover:text-zinc-300">
+              sign out
+            </button>
+          </span>
+        ) : null}
+      </div>
       <div className="flex items-center gap-3">
         <Toad className="h-8 w-8" />
         <h1 className="text-2xl font-semibold tracking-tight text-white">Workspaces</h1>

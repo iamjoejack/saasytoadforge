@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { authenticate } from './helpers'
+
+test.beforeEach(async ({ page }) => {
+  await authenticate(page)
+})
 
 /**
  * Phase 1 gate, end to end through the real UI:

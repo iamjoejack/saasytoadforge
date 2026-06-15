@@ -57,7 +57,7 @@ Legend: [ ] todo · [~] in progress · [x] done (passed its gate)
 - [x] GATE: egress-block test PASS, spend-cap test PASS, approval pause/resume PASS, per-session cost dashboard PASS. 68 unit/integration tests + 5 Playwright flows.
 
 ## Phase 5 - Auth, persistence, billing, ship  (scaffold ready; STOP boundary per 2.4)
-- [~] Supabase Auth + RLS - schema + RLS policies written (supabase/migrations/0001_init.sql); auth wiring pending SUPABASE_* (STOP)
+- [x] Auth flow works (dev provider): AuthProvider interface + DevAuthProvider (scrypt + cookie sessions) + sign-in/up page + middleware gate + sign-out. Supabase Auth is the drop-in. Verified via Playwright. (Supabase RLS schema written; real wiring pending SUPABASE_*.)
 - [~] workspace/session/artifact persistence - schema ready; repository swap-in pending SUPABASE_* (currently in-memory + in-process spend ledger)
 - [ ] Stripe subscription scaffold - pending STRIPE_* (STOP). No live charges without approval.
 - [x] README (setup, env, architecture, security, deploy)

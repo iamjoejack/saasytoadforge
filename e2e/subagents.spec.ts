@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { authenticate } from './helpers'
+
+test.beforeEach(async ({ page }) => {
+  await authenticate(page)
+})
 
 /**
  * Phase 3 gate: a multi-file task touching UI. The orchestrator decomposes it across
