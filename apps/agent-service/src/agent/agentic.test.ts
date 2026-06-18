@@ -4,6 +4,7 @@ import {
   runAgentic,
   parseToolCall,
   searchWorkspace,
+  buildRepoMap,
   compactMessages,
   type AgenticOptions,
 } from './agentic'
@@ -434,5 +435,35 @@ describe('compactMessages', () => {
     expect(out.some((m) => /earlier step/.test(m.content))).toBe(true) // middle summarized
     expect(out.length).toBeLessThan(msgs.length)
     expect(out.at(-1)?.content).toContain('#19') // most recent message preserved
+  })
+})
+
+describe('buildRepoMap', () => {
+  async function workspaceWith(files: Record<string, string>) {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    for (const [path, contents] of Object.entries(files)) {
+      await provider.writeFile(sandbox.id, path, contents)
+    }
+    return createToolSet(provider, sandbox.id, new MockBrowserTool())
+  }
+
+  it('lists source files with their top-level symbols, skipping deps and non-source', async () => {
+    const tools = await workspaceWith({
+      'src/app.ts': 'export function greet(name) {}\nexport class Server {}\n',
+      'src/util.py': 'def format_date():\n    pass\n',
+      'README.md': '# hi',
+      'node_modules/dep/index.js': 'export function x() {}',
+    })
+    const map = await buildRepoMap(tools)
+    expect(map).toContain('src/app.ts: greet, Server')
+    expect(map).toContain('src/util.py: format_date')
+    expect(map).not.toContain('README.md')
+    expect(map).not.toContain('node_modules')
+  })
+
+  it('reports when there are no source files', async () => {
+    const tools = await workspaceWith({ 'notes.txt': 'hello' })
+    expect(await buildRepoMap(tools)).toBe('(no source files found)')
   })
 })

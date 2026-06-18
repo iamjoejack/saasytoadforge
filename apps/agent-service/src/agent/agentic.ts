@@ -22,6 +22,7 @@ const KNOWN_TOOLS = new Set([
   'delete_file',
   'list_dir',
   'search',
+  'repo_map',
   'run',
   'screenshot',
   'ask',
@@ -45,6 +46,7 @@ Tools:
 - read_file   args: { "path": string }                      read a workspace file
 - list_dir    args: { "path": string }                      list a directory ("" for the root)
 - search      args: { "query": string, "path"?: string }     find text across the workspace; use this to locate code before editing
+- repo_map    args: { "path"?: string }                      overview of source files and their top-level functions and classes; use it to orient in an unfamiliar workspace
 - write_file  args: { "path": string, "contents": string }  create a new file or replace one entirely
 - edit_file   args: { "path": string, "edits": [{ "search": string, "replace": string }] }  change parts of an existing file; each edit swaps the exact "search" text for "replace"
 - delete_file args: { "path": string }                      delete a file from the workspace
@@ -314,6 +316,88 @@ export async function searchWorkspace(tools: ToolSet, query: string, root = ''):
   return matches
 }
 
+const REPO_MAP_EXTS = new Set([
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'mjs',
+  'cjs',
+  'py',
+  'go',
+  'rs',
+  'vue',
+  'svelte',
+])
+const REPO_MAP_MAX_FILES = 200
+const REPO_MAP_MAX_SYMBOLS = 12
+
+/** Pull the top-level function/class/def names out of a source file, cheaply and by regex. */
+function extractSymbols(contents: string): string[] {
+  const patterns = [
+    /export\s+(?:async\s+)?function\s+(\w+)/g,
+    /export\s+(?:abstract\s+)?class\s+(\w+)/g,
+    /export\s+const\s+(\w+)/g,
+    /^\s*(?:async\s+)?function\s+(\w+)/gm,
+    /^\s*class\s+(\w+)/gm,
+    /^\s*def\s+(\w+)/gm, // python
+    /^\s*func\s+(\w+)/gm, // go
+  ]
+  const seen = new Set<string>()
+  for (const re of patterns) {
+    let m: RegExpExecArray | null
+    while ((m = re.exec(contents)) !== null) {
+      const name = m[1]
+      if (name && !seen.has(name)) seen.add(name)
+      if (seen.size >= REPO_MAP_MAX_SYMBOLS) break
+    }
+    if (seen.size >= REPO_MAP_MAX_SYMBOLS) break
+  }
+  return [...seen]
+}
+
+/**
+ * A compact overview of the workspace: each source file with its top-level functions and
+ * classes. Codebase grounding so the agent can orient in an unfamiliar project before reading
+ * files one by one. Provider-agnostic (walks the filesystem tool), skips dependency and build
+ * directories, and only looks at recognized source extensions.
+ */
+export async function buildRepoMap(tools: ToolSet, root = ''): Promise<string> {
+  const queue: string[] = [root]
+  const lines: string[] = []
+  let filesScanned = 0
+
+  while (queue.length > 0 && filesScanned < REPO_MAP_MAX_FILES) {
+    const dir = queue.shift() ?? ''
+    let entries
+    try {
+      entries = await tools.fs.list(dir)
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      if (entry.type === 'dir') {
+        if (!SEARCH_SKIP_DIRS.has(entry.name)) queue.push(entry.path)
+        continue
+      }
+      const ext = entry.name.includes('.') ? (entry.name.split('.').pop() ?? '') : ''
+      if (!REPO_MAP_EXTS.has(ext)) continue
+      if (filesScanned >= REPO_MAP_MAX_FILES) break
+      filesScanned += 1
+      let contents: string
+      try {
+        contents = await tools.fs.read(entry.path)
+      } catch {
+        continue
+      }
+      const symbols = extractSymbols(contents)
+      lines.push(symbols.length > 0 ? `${entry.path}: ${symbols.join(', ')}` : entry.path)
+    }
+  }
+
+  return lines.length > 0 ? lines.sort().join('\n') : '(no source files found)'
+}
+
 /**
  * Run the agentic loop, streaming artifacts as AgentEvents. Emits its own terminal
  * `done` event, mirroring Agent.run, so the caller only manages the running flag.
@@ -558,6 +642,10 @@ async function runTool(
         matches.length >= SEARCH_MAX_MATCHES ? `\n...(showing the first ${SEARCH_MAX_MATCHES})` : ''
       const plural = matches.length === 1 ? '' : 'es'
       return `${matches.length} match${plural} for "${query}":\n${matches.join('\n')}${note}`
+    }
+
+    case 'repo_map': {
+      return buildRepoMap(tools, str(call.args.path))
     }
 
     case 'write_file': {
