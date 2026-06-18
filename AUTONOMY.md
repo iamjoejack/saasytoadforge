@@ -30,17 +30,17 @@ independent parts.
 Each lever maps to a concrete integration point in `apps/agent-service`. Status reflects
 what is actually built.
 
-| #   | Lever                                             | Evidence                                                              | Status                                                                                                      | Seam                                                          |
-| --- | ------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| 1   | Diff / search-replace edits with a fuzzy applier  | 26% -> 59%; edit interface alone 6.7% -> 68.3%; ~9x fewer edit errors | DONE                                                                                                        | `agent/apply-edit.ts`, `edit_file` tool in `agent/agentic.ts` |
-| 2   | Real execution + per-edit test feedback           | +54% relative                                                         | DONE (E2B turns on automatically when a key is set; verification at finish via lever 5)                     | `sandbox/index.ts`                                            |
-| 3   | Git checkpoint / rollback                         | reversibility = safe autonomy (the Replit prod-DB lesson)             | DONE (capability: `checkpoint`/`restore` on mock + E2B shadow git; loop-consumer / UI revert still to wire) | `packages/shared/src/sandbox.ts`, providers                   |
-| 4   | Stuck detection                                   | loops are the top production failure                                  | DONE (refuses the third identical call in a row)                                                            | loop body in `agentic.ts`                                     |
-| 5   | Ronald as in-loop verifier                        | ground truth beats self-rating                                        | DONE (verify gate before finish, bounded re-prompt, wired to `reviewWorkspace`)                             | `agentic.ts`, `server.ts`                                     |
-| 6   | Codebase grounding (grep)                         | repo graph +32.8%                                                     | DONE (`search` tool + `searchWorkspace`); repo map / PageRank still to add                                  | `agent/agentic.ts`, `tools.ts`                                |
-| 7   | Best-of-N + executable-test selector              | CodeMonkeys 57.4% vs 69.8% oracle ceiling                             | TODO                                                                                                        | new orchestrator wrapping `runAgentic`                        |
-| 8   | Native tool calling (replace heuristic JSON)      | one bad JSON ends the task today                                      | TODO                                                                                                        | `LlmClient.complete` contract in `agent/llm.ts`               |
-| 9   | Long-horizon context (tiered compaction + memory) | subagent isolation is the biggest context lever                       | TODO                                                                                                        | history trim in `agentic.ts`; new module in `persistence/`    |
+| #   | Lever                                                               | Evidence                                                              | Status                                                                                                      | Seam                                                          |
+| --- | ------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 1   | Diff / search-replace edits with a fuzzy applier                    | 26% -> 59%; edit interface alone 6.7% -> 68.3%; ~9x fewer edit errors | DONE                                                                                                        | `agent/apply-edit.ts`, `edit_file` tool in `agent/agentic.ts` |
+| 2   | Real execution + per-edit test feedback                             | +54% relative                                                         | DONE (E2B turns on automatically when a key is set; verification at finish via lever 5)                     | `sandbox/index.ts`                                            |
+| 3   | Git checkpoint / rollback                                           | reversibility = safe autonomy (the Replit prod-DB lesson)             | DONE (capability: `checkpoint`/`restore` on mock + E2B shadow git; loop-consumer / UI revert still to wire) | `packages/shared/src/sandbox.ts`, providers                   |
+| 4   | Stuck detection                                                     | loops are the top production failure                                  | DONE (refuses the third identical call in a row)                                                            | loop body in `agentic.ts`                                     |
+| 5   | Ronald as in-loop verifier                                          | ground truth beats self-rating                                        | DONE (verify gate before finish, bounded re-prompt, wired to `reviewWorkspace`)                             | `agentic.ts`, `server.ts`                                     |
+| 6   | Codebase grounding (grep)                                           | repo graph +32.8%                                                     | DONE (`search` tool + `searchWorkspace`); repo map / PageRank still to add                                  | `agent/agentic.ts`, `tools.ts`                                |
+| 7   | Best-of-N + executable-test selector                                | CodeMonkeys 57.4% vs 69.8% oracle ceiling                             | DONE (`runBestOfN` + `scoreByPassingRun`; opt-in primitive, not on the default path yet)                    | `agent/best-of-n.ts`                                          |
+| 8   | Tool-protocol robustness (the practical win of native tool calling) | one bad JSON ends the task today                                      | DONE (forgiving parse + malformed-call re-prompt; full provider-native tool calling still optional)         | `agent/agentic.ts`                                            |
+| 9   | Long-horizon context (compaction)                                   | the working transcript blows the context window on long turns         | DONE (`compactMessages` snip tier); LLM-summary + persistent memory still to add                            | `agent/agentic.ts`                                            |
 
 Also shipped: a `delete_file` tool (the agent can remove files, not just create and edit them) and an edit-uniqueness guard (an exact-match edit whose search text appears more than once is refused rather than silently editing the wrong place).
 
@@ -107,12 +107,12 @@ cost per task. That number is what turns "little giant" into a fact.
   number needs a model key + E2B).
 - Phase 1, verification loop: in-loop verification before finish (DONE), stuck detection
   (DONE), Ronald as in-loop critic (DONE); grounded reflection capped at 2 to 3 still to add.
-- Phase 2, grounding and robustness: grep search (DONE), repo map still to add, native tool
-  calling still to add.
-- Phase 3, test-time compute: best-of-N + executable-test selector, parallel context
-  subagents.
-- Phase 4, scale and horizon: tiered compaction + persistent memory, parallel
-  independent-work worktrees + merge.
+- Phase 2, grounding and robustness: grep search (DONE), tool-protocol robustness (DONE);
+  repo map and full provider-native tool calling still to add.
+- Phase 3, test-time compute: best-of-N selector (DONE as an opt-in primitive); live
+  integration and parallel context subagents still to add.
+- Phase 4, scale and horizon: working-transcript compaction (DONE); persistent memory and
+  parallel independent-work worktrees + merge still to add.
 - Surfaces: mobile mission control, non-dev and pro-dev skins.
 
 This is a multi-week program, sequenced by evidence, with every step measurable.
