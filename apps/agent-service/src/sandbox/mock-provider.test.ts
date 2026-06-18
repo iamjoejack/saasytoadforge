@@ -124,6 +124,26 @@ describe('MockSandboxProvider', () => {
     await provider.destroy(sandbox.id)
     await expect(provider.readFile(sandbox.id, 'x')).rejects.toThrow(/unknown sandbox/)
   })
+
+  it('checkpoints and restores the filesystem', async () => {
+    const { provider, sandbox } = await freshSandbox()
+    await provider.writeFile(sandbox.id, 'a.txt', 'one')
+    const ref = await provider.checkpoint(sandbox.id)
+
+    // Change the world after the checkpoint: edit a file and add a new one.
+    await provider.writeFile(sandbox.id, 'a.txt', 'two')
+    await provider.writeFile(sandbox.id, 'b.txt', 'new')
+    expect(await provider.readFile(sandbox.id, 'a.txt')).toBe('two')
+
+    await provider.restore(sandbox.id, ref)
+    expect(await provider.readFile(sandbox.id, 'a.txt')).toBe('one') // edit rolled back
+    await expect(provider.readFile(sandbox.id, 'b.txt')).rejects.toThrow(/no such file/) // added file gone
+  })
+
+  it('rejects restoring an unknown checkpoint ref', async () => {
+    const { provider, sandbox } = await freshSandbox()
+    await expect(provider.restore(sandbox.id, 'nope')).rejects.toThrow(/unknown checkpoint/)
+  })
 })
 
 describe('createSandboxProvider', () => {

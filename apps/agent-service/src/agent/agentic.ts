@@ -3,6 +3,7 @@ import type { LlmClient, LlmMessage } from './llm'
 import type { ToolSet } from './tools'
 import type { ApprovalGate, QuestionGate } from './agent'
 import { unifiedDiff } from './diff'
+import { applyEdits, type EditBlock } from './apply-edit'
 
 /**
  * A provider-agnostic agentic loop. The model either calls a tool (by replying with a
@@ -17,6 +18,7 @@ import { unifiedDiff } from './diff'
 const KNOWN_TOOLS = new Set([
   'read_file',
   'write_file',
+  'edit_file',
   'list_dir',
   'run',
   'screenshot',
@@ -34,7 +36,8 @@ You can use tools to inspect and change the workspace, and to ask the user quest
 Tools:
 - read_file   args: { "path": string }                      read a workspace file
 - list_dir    args: { "path": string }                      list a directory ("" for the root)
-- write_file  args: { "path": string, "contents": string }  create or overwrite a whole file
+- write_file  args: { "path": string, "contents": string }  create a new file or replace one entirely
+- edit_file   args: { "path": string, "edits": [{ "search": string, "replace": string }] }  change parts of an existing file; each edit swaps the exact "search" text for "replace"
 - run         args: { "cmd": string }                        run a shell command (tests, build, grep, install, etc.)
 - screenshot  args: { "path": string, "label": string }      render an HTML file and capture it
 - ask         args: { "question": string, "options"?: string[], "multiSelect"?: boolean }  ask the user; the answer comes back as the observation
@@ -44,7 +47,7 @@ Rules:
 - Work in small steps. Read or list before you edit. After editing code, run the relevant tests or build to verify.
 - Use the right integration for the job. When a task needs a database, payments, email, automation, or hosting, wire up the connector that is available in this workspace (listed below) rather than rolling your own.
 - Paths are workspace-relative. Never use "../" or absolute paths.
-- write_file replaces the entire file; include the full intended contents.
+- To change an existing file, prefer edit_file: read the file first, then copy the exact text you want to change into "search" (no line numbers) and the new version into "replace". Keep each search block small and unique. Use write_file only to create a new file or replace one entirely.
 - When the task is done, call finish with a brief plain-language summary.
 - If the user is just chatting or asking a question that needs no tools, reply in plain prose instead of JSON.
 
@@ -157,6 +160,27 @@ function str(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+/** Pull the { search, replace } edit blocks out of an edit_file tool call. */
+function parseEditBlocks(args: Record<string, unknown>): EditBlock[] {
+  const out: EditBlock[] = []
+  if (Array.isArray(args.edits)) {
+    for (const entry of args.edits) {
+      if (entry && typeof entry === 'object') {
+        const obj = entry as Record<string, unknown>
+        out.push({ search: str(obj.search), replace: str(obj.replace) })
+      }
+    }
+  } else if (typeof args.search === 'string' || typeof args.replace === 'string') {
+    out.push({ search: str(args.search), replace: str(args.replace) })
+  }
+  return out.filter((b) => !(b.search === '' && b.replace === ''))
+}
+
+/** A stable signature for a tool call, used to detect a stuck, repeating loop. */
+function fingerprint(call: ToolCall): string {
+  return `${call.tool}:${JSON.stringify(call.args)}`
+}
+
 /**
  * Run the agentic loop, streaming artifacts as AgentEvents. Emits its own terminal
  * `done` event, mirroring Agent.run, so the caller only manages the running flag.
@@ -173,6 +197,8 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
   let ok = true
   let finalText = ''
   let usedTools = false
+  let prevFingerprint = ''
+  let repeatCount = 0
 
   for (let step = 0; step < maxSteps; step++) {
     if (signal?.aborted) {
@@ -214,6 +240,32 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
     }
 
     usedTools = true
+
+    // Stuck detection: three identical tool calls in a row with no intervening progress
+    // means the agent is looping. Refuse to run it again and nudge it to change course
+    // (a warning alone gets ignored; not executing is what breaks the loop).
+    const sig = fingerprint(call)
+    if (sig === prevFingerprint) {
+      repeatCount += 1
+    } else {
+      repeatCount = 0
+      prevFingerprint = sig
+    }
+    if (repeatCount >= 2) {
+      emit({
+        type: 'message',
+        text: 'Stopping a repeated action that was not making progress.',
+        agent: 'orchestrator',
+      })
+      messages.push({
+        role: 'user',
+        content:
+          `Observation from ${call.tool}: you have repeated the exact same ${call.tool} call ${repeatCount + 1} times in a row with no change. ` +
+          'That is not making progress. Try a different approach, gather more context, or call finish if you are blocked.',
+      })
+      continue
+    }
+
     let observation: string
     try {
       observation = await runTool(call, tools, approvals, emit, {
@@ -224,7 +276,10 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
     } catch (err) {
       observation = `error: ${err instanceof Error ? err.message : String(err)}`
     }
-    messages.push({ role: 'user', content: `Observation from ${call.tool}: ${truncate(observation)}` })
+    messages.push({
+      role: 'user',
+      content: `Observation from ${call.tool}: ${truncate(observation)}`,
+    })
 
     if (step === maxSteps - 1) {
       emit({
@@ -265,7 +320,8 @@ async function runTool(
     case 'ask': {
       const question = str(call.args.question)
       if (!question) return 'error: ask needs a question'
-      if (!ctx.questions) return 'asking is not available in this run; proceed with your best assumption'
+      if (!ctx.questions)
+        return 'asking is not available in this run; proceed with your best assumption'
       const rawOptions = Array.isArray(call.args.options) ? call.args.options : []
       const options = rawOptions.map((o) => String(o)).filter(Boolean)
       const id = `ask_${ctx.stepId}`
@@ -322,6 +378,37 @@ async function runTool(
         agent: 'coder',
       })
       return `wrote ${contents.length} chars to ${path}`
+    }
+
+    case 'edit_file': {
+      const path = str(call.args.path)
+      if (!path) return 'error: edit_file needs a path'
+      const blocks = parseEditBlocks(call.args)
+      if (blocks.length === 0) return 'error: edit_file needs at least one { search, replace } edit'
+
+      let before: string
+      try {
+        before = await tools.fs.read(path)
+      } catch {
+        return `error: ${path} does not exist; use write_file to create it`
+      }
+
+      const applied = applyEdits(before, blocks)
+      if (!applied.ok) return `error: ${applied.reason}`
+      const after = applied.contents
+      if (after === before) return `no change: that edit left ${path} identical`
+
+      if (requireWriteApproval) {
+        const id = `edit:${path}`
+        emit({ type: 'approval', id, action: 'Edit file', detail: path })
+        const approved = await approvals.request(id)
+        if (!approved) return 'edit rejected by the user'
+      }
+
+      await tools.fs.write(path, after)
+      emit({ type: 'edit', path, diff: unifiedDiff(path, before, after), before, agent: 'coder' })
+      const plural = blocks.length > 1 ? 's' : ''
+      return `edited ${path} (${blocks.length} change${plural}, ${applied.strategy} match)`
     }
 
     case 'run': {

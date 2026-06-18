@@ -59,5 +59,13 @@ export interface SandboxProvider {
   openShell(id: string): AsyncShellSession
   /** Default-deny egress; only these domains (plus package registries) are reachable. */
   setEgressAllowlist(id: string, domains: string[]): Promise<void>
+  /**
+   * Snapshot the workspace filesystem and return an opaque ref. The basis for safe
+   * autonomy: the agent can roll back to a checkpoint when an edit or a verification step
+   * goes wrong, so no single bad action is unrecoverable.
+   */
+  checkpoint(id: string): Promise<string>
+  /** Restore the workspace filesystem to a prior checkpoint ref from `checkpoint`. */
+  restore(id: string, ref: string): Promise<void>
   destroy(id: string): Promise<void>
 }

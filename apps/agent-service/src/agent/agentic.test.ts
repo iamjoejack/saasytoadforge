@@ -158,4 +158,52 @@ describe('runAgentic', () => {
     expect(events.some((e) => e.type === 'edit')).toBe(false)
     await expect(provider.readFile(sandbox.id, 'danger.txt')).rejects.toThrow()
   })
+
+  it('applies a surgical change with edit_file instead of overwriting', async () => {
+    const { provider, sandbox, events, result } = await setup(
+      [
+        '{"tool":"write_file","args":{"path":"app.js","contents":"const port = 3000\\nconsole.log(port)\\n"}}',
+        '{"tool":"edit_file","args":{"path":"app.js","edits":[{"search":"const port = 3000","replace":"const port = 8080"}]}}',
+        '{"tool":"finish","args":{"summary":"changed the port"}}',
+      ],
+      'change the port to 8080',
+    )
+
+    expect(result.ok).toBe(true)
+    expect(events.filter((e) => e.type === 'edit').length).toBe(2)
+    const after = await provider.readFile(sandbox.id, 'app.js')
+    expect(after).toContain('const port = 8080')
+    expect(after).not.toContain('3000')
+    expect(after).toContain('console.log(port)') // the rest of the file is untouched
+  })
+
+  it('reports a helpful error when edit_file targets a missing file', async () => {
+    const { events, result } = await setup(
+      [
+        '{"tool":"edit_file","args":{"path":"nope.js","edits":[{"search":"a","replace":"b"}]}}',
+        '{"tool":"finish","args":{"summary":"done"}}',
+      ],
+      'edit a file that does not exist',
+    )
+
+    expect(result.ok).toBe(true)
+    expect(events.some((e) => e.type === 'edit')).toBe(false)
+  })
+
+  it('stops a tool call repeated three times in a row', async () => {
+    const { events, result } = await setup(
+      [
+        '{"tool":"run","args":{"cmd":"ls"}}',
+        '{"tool":"run","args":{"cmd":"ls"}}',
+        '{"tool":"run","args":{"cmd":"ls"}}',
+        '{"tool":"finish","args":{"summary":"giving up"}}',
+      ],
+      'list the directory over and over',
+    )
+
+    expect(result.ok).toBe(true)
+    // The third identical run is blocked, so only the first two actually execute.
+    expect(events.filter((e) => e.type === 'terminal').length).toBe(2)
+    expect(events.some((e) => e.type === 'message' && /repeated action/i.test(e.text))).toBe(true)
+  })
 })

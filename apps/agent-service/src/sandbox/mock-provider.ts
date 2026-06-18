@@ -25,6 +25,8 @@ interface MockState {
   meta: Sandbox
   files: Map<string, string>
   egress: string[]
+  /** Filesystem snapshots, keyed by checkpoint ref. */
+  checkpoints: Map<string, Map<string, string>>
 }
 
 /** Workspace-relative path, no leading "./" or "/", collapsed slashes. */
@@ -136,7 +138,7 @@ export class MockSandboxProvider implements SandboxProvider {
   async create(opts: CreateSandboxOptions): Promise<Sandbox> {
     const id = `mock_${randomUUID()}`
     const meta: Sandbox = { id, template: opts.template, createdAt: new Date().toISOString() }
-    this.sandboxes.set(id, { meta, files: new Map(), egress: [] })
+    this.sandboxes.set(id, { meta, files: new Map(), egress: [], checkpoints: new Map() })
     return meta
   }
 
@@ -159,7 +161,7 @@ export class MockSandboxProvider implements SandboxProvider {
     const normalized = normalizePath(path)
     const state = this.state(id)
     state.files.delete(normalized)
-    
+
     // Recursively delete folder children
     const prefix = normalized + '/'
     for (const key of Array.from(state.files.keys())) {
@@ -254,6 +256,22 @@ export class MockSandboxProvider implements SandboxProvider {
 
   async setEgressAllowlist(id: string, domains: string[]): Promise<void> {
     this.state(id).egress = [...domains]
+  }
+
+  async checkpoint(id: string): Promise<string> {
+    const state = this.state(id)
+    const ref = randomUUID()
+    // Clone so later edits do not mutate the snapshot.
+    state.checkpoints.set(ref, new Map(state.files))
+    return ref
+  }
+
+  async restore(id: string, ref: string): Promise<void> {
+    const state = this.state(id)
+    const snapshot = state.checkpoints.get(ref)
+    if (!snapshot) throw new Error(`mock-sandbox: unknown checkpoint '${ref}'`)
+    // Clone again so restoring twice from the same ref stays correct.
+    state.files = new Map(snapshot)
   }
 
   async destroy(id: string): Promise<void> {
