@@ -76,23 +76,19 @@ export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
 
   // Parse JSON ourselves so we can retain the raw bytes for Stripe webhook signature
   // verification. Empty bodies (common on POST/DELETE with no payload) parse to {}.
-  app.addContentTypeParser(
-    'application/json',
-    { parseAs: 'buffer' },
-    (req, body, done) => {
-      const buf = body as Buffer
-      if (buf.length > 0) req.rawBody = buf
-      if (buf.length === 0) {
-        done(null, {})
-        return
-      }
-      try {
-        done(null, JSON.parse(buf.toString('utf8')))
-      } catch (err) {
-        done(err instanceof Error ? err : new Error('invalid json'), undefined)
-      }
-    },
-  )
+  app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
+    const buf = body as Buffer
+    if (buf.length > 0) req.rawBody = buf
+    if (buf.length === 0) {
+      done(null, {})
+      return
+    }
+    try {
+      done(null, JSON.parse(buf.toString('utf8')))
+    } catch (err) {
+      done(err instanceof Error ? err : new Error('invalid json'), undefined)
+    }
+  })
 
   void app.register(cors, {
     origin: allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:3000'],
@@ -133,7 +129,7 @@ function routes(
   const caps: SpendCaps = {
     perUserUsd: env.SPEND_CAP_USER_USD,
     globalUsd: env.SPEND_CAP_GLOBAL_USD,
-    unlimitedMode: false,        // toggled per-user via spend_topup_mode command; global default=off
+    unlimitedMode: false, // toggled per-user via spend_topup_mode command; global default=off
     approvalBlockUsd: 5,
   }
   const secrets = secretStatus(env)
@@ -147,9 +143,10 @@ function routes(
     secrets.upstashRedis && 'Upstash Redis (cache and queues)',
   ].filter((c): c is string => Boolean(c))
   const billing = createBillingProvider(env)
-  const sessionStore = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
-    ? new SupabaseSessionStore(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
-    : new InMemorySessionStore()
+  const sessionStore =
+    env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
+      ? new SupabaseSessionStore(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+      : new InMemorySessionStore()
 
   return async (app) => {
     // Auth: every REST route except PUBLIC_PATHS requires a valid signed token.
@@ -187,18 +184,21 @@ function routes(
       }
     })
 
-    app.get('/config', async (): Promise<ConfigSummary> => ({
-      models: modelRouting(env),
-      sandboxProvider: env.SANDBOX_PROVIDER,
-      egressAllowlist: parseEgressAllowlist(env),
-      caps: {
-        perUserUsd: caps.perUserUsd,
-        globalUsd: caps.globalUsd,
-        unlimitedMode: caps.unlimitedMode,
-        approvalBlockUsd: caps.approvalBlockUsd,
-      },
-      secrets,
-    }))
+    app.get(
+      '/config',
+      async (): Promise<ConfigSummary> => ({
+        models: modelRouting(env),
+        sandboxProvider: env.SANDBOX_PROVIDER,
+        egressAllowlist: parseEgressAllowlist(env),
+        caps: {
+          perUserUsd: caps.perUserUsd,
+          globalUsd: caps.globalUsd,
+          unlimitedMode: caps.unlimitedMode,
+          approvalBlockUsd: caps.approvalBlockUsd,
+        },
+        secrets,
+      }),
+    )
 
     app.get('/billing/plans', async () => billing.plans())
 
@@ -225,7 +225,9 @@ function routes(
         fulfillment = await billing.handleWebhook(req.rawBody.toString('utf8'), signature)
       } catch (err) {
         // Bad/forged signature, or webhook secret missing. Refuse, do not fulfil.
-        logger.warn('stripe webhook rejected', { error: err instanceof Error ? err.message : String(err) })
+        logger.warn('stripe webhook rejected', {
+          error: err instanceof Error ? err.message : String(err),
+        })
         return reply.code(400).send({ error: 'invalid signature' })
       }
       if (fulfillment?.customerEmail && fulfillment.creditUsd > 0) {
@@ -443,7 +445,7 @@ function routes(
 
       const approvals = new ApprovalGate()
       const questions = new QuestionGate()
-      const spendApprovals = new ApprovalGate()  // separate gate for spend confirmations
+      const spendApprovals = new ApprovalGate() // separate gate for spend confirmations
       const tools = createToolSet(provider, ws.sandboxId, browser)
       const agent = new Agent(tools)
       /** Rolling chat history for this connection, so the window behaves like a chat. */
@@ -495,9 +497,12 @@ function routes(
         // Toggle unlimited mode for this connection (persisted in agent-service memory).
         if (cmd.type === 'spend_topup_mode') {
           userUnlimitedMode = cmd.enabled
-          send({ type: 'message', text: userUnlimitedMode
-            ? 'Unlimited top-up mode is on. You will be asked before each credit block.'
-            : 'Spend cap mode is on. Runs will stop at your credit limit.' })
+          send({
+            type: 'message',
+            text: userUnlimitedMode
+              ? 'Unlimited top-up mode is on. You will be asked before each credit block.'
+              : 'Spend cap mode is on. Runs will stop at your credit limit.',
+          })
           return
         }
         // Spend top-up approval response: user confirmed a credit extension.
@@ -568,7 +573,8 @@ function routes(
                 type: 'approval',
                 id: spendApprovalId,
                 action: 'Spend credit extension',
-                detail: check.approvalDetail ?? `Approve a $${blockUsd.toFixed(2)} credit extension?`,
+                detail:
+                  check.approvalDetail ?? `Approve a $${blockUsd.toFixed(2)} credit extension?`,
               })
               const approved = await spendApprovals.request(spendApprovalId)
               if (!approved) {
@@ -614,6 +620,10 @@ function routes(
           const task = interviewing
             ? `${DISCOVERY_DIRECTIVE}\n\nUser request: ${cmd.task}`
             : cmd.task
+          // On a real sandbox, Ronald reviews the workspace before the agent is allowed to
+          // finish. On the mock sandbox the build cannot really run, so skip it rather than
+          // spend a review call that can only ever say "could not verify".
+          const reviewSimulated = ws.sandboxId.startsWith('mock_')
           void runAgentic(
             {
               task,
@@ -626,6 +636,16 @@ function routes(
               requireWriteApproval: cmd.requireWriteApproval,
               signal: abort.signal,
               history: chatHistory,
+              verify: reviewSimulated
+                ? undefined
+                : async () => {
+                    const verdict = await reviewWorkspace(provider, ws.sandboxId, {
+                      llm: llmClient,
+                      model: modelRouting(env).frontier,
+                      simulated: false,
+                    })
+                    return { ok: verdict.ready, summary: verdict.summary }
+                  },
             },
             send,
           ).finally(() => {

@@ -131,6 +131,40 @@ export class E2BSandboxProvider implements SandboxProvider {
     // E2B enforces network policy at the microVM/template firewall level, not per call.
   }
 
+  async checkpoint(id: string): Promise<string> {
+    // Shadow git: GIT_DIR/GIT_WORK_TREE point at a private repo so we never create a .git
+    // in the workspace or touch any real history the project may have. node_modules and
+    // build output are excluded so snapshots stay fast. Returns the commit SHA as the ref.
+    const cmd = `sh -c '
+      export GIT_DIR="$HOME/.forge-shadow.git" GIT_WORK_TREE="$HOME"
+      if [ ! -d "$GIT_DIR" ]; then
+        git init -q
+        git config user.email forge@saasytoad.local
+        git config user.name "Forge"
+        mkdir -p "$GIT_DIR/info"
+        printf "node_modules/\\n.next/\\ndist/\\n.cache/\\n.git/\\n" > "$GIT_DIR/info/exclude"
+      fi
+      git add -A
+      git commit -q --allow-empty -m "forge checkpoint" >/dev/null 2>&1 || true
+      git rev-parse HEAD
+    '`
+    const res = await this.exec(id, cmd)
+    const ref = res.stdout.trim()
+    if (res.exitCode !== 0 || !ref) {
+      throw new Error(`e2b checkpoint failed: ${res.stderr || res.stdout || 'no commit'}`)
+    }
+    return ref
+  }
+
+  async restore(id: string, ref: string): Promise<void> {
+    // ref is always a commit SHA we produced; reject anything else so it can't be used for
+    // shell injection.
+    if (!/^[0-9a-f]{7,40}$/.test(ref)) throw new Error('e2b restore: invalid checkpoint ref')
+    const cmd = `sh -c 'export GIT_DIR="$HOME/.forge-shadow.git" GIT_WORK_TREE="$HOME"; git reset --hard ${ref} -q'`
+    const res = await this.exec(id, cmd)
+    if (res.exitCode !== 0) throw new Error(`e2b restore failed: ${res.stderr || res.stdout}`)
+  }
+
   async destroy(id: string): Promise<void> {
     const sbx = this.sandboxes.get(id)
     if (!sbx) return

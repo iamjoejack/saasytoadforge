@@ -3,6 +3,8 @@ import type { LlmClient, LlmMessage } from './llm'
 import type { ToolSet } from './tools'
 import type { ApprovalGate, QuestionGate } from './agent'
 import { unifiedDiff } from './diff'
+import { applyEdits, type EditBlock } from './apply-edit'
+import { getSkill, listSkills } from './skills'
 
 /**
  * A provider-agnostic agentic loop. The model either calls a tool (by replying with a
@@ -17,14 +19,26 @@ import { unifiedDiff } from './diff'
 const KNOWN_TOOLS = new Set([
   'read_file',
   'write_file',
+  'edit_file',
+  'delete_file',
   'list_dir',
+  'search',
+  'repo_map',
+  'skill',
   'run',
   'screenshot',
   'ask',
+  'revert',
   'finish',
 ])
 
 const MAX_OBSERVATION_CHARS = 6000
+
+/** Rough character budget for the working transcript sent to the model on a single turn. */
+const MAX_CONTEXT_CHARS = 48_000
+
+/** How many times one turn will re-prompt a model that emits a malformed tool call. */
+const MAX_REPARSE_ATTEMPTS = 2
 
 export const AGENTIC_SYSTEM_PROMPT = `You are Ronald, the SaaSyToad Forge coding agent, working inside an isolated sandbox workspace.
 
@@ -34,17 +48,24 @@ You can use tools to inspect and change the workspace, and to ask the user quest
 Tools:
 - read_file   args: { "path": string }                      read a workspace file
 - list_dir    args: { "path": string }                      list a directory ("" for the root)
-- write_file  args: { "path": string, "contents": string }  create or overwrite a whole file
+- search      args: { "query": string, "path"?: string }     find text across the workspace; use this to locate code before editing
+- repo_map    args: { "path"?: string }                      overview of source files and their top-level functions and classes; use it to orient in an unfamiliar workspace
+- skill       args: { "name"?: string }                      load an expert checklist for a specialized job (SEO, mobile, accessibility, performance, security, tdd, debugging, code review, refactoring, architecture, prototyping, frontend design, copywriting, Next.js, Supabase, API design, research, MCP servers, document export); call with no name to list them all
+- write_file  args: { "path": string, "contents": string }  create a new file or replace one entirely
+- edit_file   args: { "path": string, "edits": [{ "search": string, "replace": string }] }  change parts of an existing file; each edit swaps the exact "search" text for "replace"
+- delete_file args: { "path": string }                      delete a file from the workspace
 - run         args: { "cmd": string }                        run a shell command (tests, build, grep, install, etc.)
 - screenshot  args: { "path": string, "label": string }      render an HTML file and capture it
 - ask         args: { "question": string, "options"?: string[], "multiSelect"?: boolean }  ask the user; the answer comes back as the observation
+- revert       args: {}                                       undo all of your changes this turn and return the workspace to how it started; use it if your approach went wrong
 - finish      args: { "summary": string }                    end the task with a short summary
 
 Rules:
-- Work in small steps. Read or list before you edit. After editing code, run the relevant tests or build to verify.
+- Work in small steps. Use search or list_dir to find the right file, and read it before you edit. After editing code, run the relevant tests or build to verify.
 - Use the right integration for the job. When a task needs a database, payments, email, automation, or hosting, wire up the connector that is available in this workspace (listed below) rather than rolling your own.
 - Paths are workspace-relative. Never use "../" or absolute paths.
-- write_file replaces the entire file; include the full intended contents.
+- To change an existing file, prefer edit_file: read the file first, then copy the exact text you want to change into "search" (no line numbers) and the new version into "replace". Keep each search block small and unique. Use write_file only to create a new file or replace one entirely.
+- For a specialized job like SEO or mobile optimization, call the skill tool first to load the right expert checklist, then apply it.
 - When the task is done, call finish with a brief plain-language summary.
 - If the user is just chatting or asking a question that needs no tools, reply in plain prose instead of JSON.
 
@@ -80,6 +101,12 @@ export interface AgenticOptions {
   history: LlmMessage[]
   /** Hard cap on tool iterations (default 16). */
   maxSteps?: number
+  /**
+   * Ronald's in-loop verification. When provided, the agent's `finish` is gated on it
+   * whenever edits were made: a failing verdict re-prompts the agent once to fix the build
+   * (it never hard-blocks past one attempt, so the loop always terminates).
+   */
+  verify?: () => Promise<{ ok: boolean; summary: string }>
 }
 
 export type Emit = (event: AgentEvent) => void
@@ -118,6 +145,16 @@ function extractFirstJsonObject(text: string): string | null {
   return null
 }
 
+/** Remove trailing commas before a closing } or ], a common model JSON error. */
+function stripTrailingCommas(s: string): string {
+  return s.replace(/,(\s*[}\]])/g, '$1')
+}
+
+/** True when output looks like an attempted (but unparseable) tool call rather than prose. */
+export function looksLikeToolAttempt(raw: string): boolean {
+  return raw.includes('{') && /"tool"\s*:/.test(raw)
+}
+
 /** Interpret model output as a tool call, or null when it is a plain prose reply. */
 export function parseToolCall(raw: string): ToolCall | null {
   const candidates: string[] = []
@@ -132,7 +169,12 @@ export function parseToolCall(raw: string): ToolCall | null {
     try {
       parsed = JSON.parse(candidate)
     } catch {
-      continue
+      // Forgive a common formatting slip (a trailing comma) before giving up on this candidate.
+      try {
+        parsed = JSON.parse(stripTrailingCommas(candidate))
+      } catch {
+        continue
+      }
     }
     if (!parsed || typeof parsed !== 'object') continue
     const obj = parsed as Record<string, unknown>
@@ -153,8 +195,213 @@ function truncate(text: string): string {
   return `${text.slice(0, MAX_OBSERVATION_CHARS)}\n...[truncated ${text.length - MAX_OBSERVATION_CHARS} chars]`
 }
 
+/**
+ * Keep the working transcript within a rough character budget on long turns. Preserves the
+ * system prompt and the original task, keeps the most recent messages in full, and replaces
+ * the older middle with a short placeholder. This is the cheap "snip" tier of compaction: no
+ * LLM call, and no loss of the load-bearing head or the recent context. Returns the input
+ * unchanged when it already fits.
+ */
+export function compactMessages(
+  messages: LlmMessage[],
+  maxChars = MAX_CONTEXT_CHARS,
+): LlmMessage[] {
+  const total = messages.reduce((n, m) => n + m.content.length, 0)
+  if (total <= maxChars) return messages
+
+  // Always keep the system message(s) and the first user message (the task).
+  const head: LlmMessage[] = []
+  let i = 0
+  while (i < messages.length && messages[i]?.role === 'system') {
+    head.push(messages[i] as LlmMessage)
+    i++
+  }
+  if (i < messages.length) {
+    head.push(messages[i] as LlmMessage)
+    i++
+  }
+
+  // Keep as many of the most recent messages as fit in the remaining budget.
+  const headChars = head.reduce((n, m) => n + m.content.length, 0)
+  const budget = Math.max(0, maxChars - headChars)
+  const tail: LlmMessage[] = []
+  let used = 0
+  for (let j = messages.length - 1; j >= i; j--) {
+    const m = messages[j] as LlmMessage
+    if (tail.length > 0 && used + m.content.length > budget) break
+    tail.unshift(m)
+    used += m.content.length
+  }
+
+  const omitted = messages.length - head.length - tail.length
+  if (omitted <= 0) return messages
+
+  const note: LlmMessage = {
+    role: 'user',
+    content: `[${omitted} earlier step${omitted === 1 ? '' : 's'} omitted to stay within the context budget. Read files again if you need detail from them.]`,
+  }
+  return [...head, note, ...tail]
+}
+
 function str(value: unknown): string {
   return typeof value === 'string' ? value : ''
+}
+
+/** Pull the { search, replace } edit blocks out of an edit_file tool call. */
+function parseEditBlocks(args: Record<string, unknown>): EditBlock[] {
+  const out: EditBlock[] = []
+  if (Array.isArray(args.edits)) {
+    for (const entry of args.edits) {
+      if (entry && typeof entry === 'object') {
+        const obj = entry as Record<string, unknown>
+        out.push({ search: str(obj.search), replace: str(obj.replace) })
+      }
+    }
+  } else if (typeof args.search === 'string' || typeof args.replace === 'string') {
+    out.push({ search: str(args.search), replace: str(args.replace) })
+  }
+  return out.filter((b) => !(b.search === '' && b.replace === ''))
+}
+
+/** A stable signature for a tool call, used to detect a stuck, repeating loop. */
+function fingerprint(call: ToolCall): string {
+  return `${call.tool}:${JSON.stringify(call.args)}`
+}
+
+const SEARCH_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.cache'])
+const SEARCH_MAX_FILES = 300
+const SEARCH_MAX_MATCHES = 50
+
+/**
+ * Grep-style content search across the workspace, for codebase grounding: the agent locates
+ * code before editing instead of reading files blindly. Provider-agnostic (walks the
+ * filesystem tool, so it behaves the same on the mock and on E2B), bounded by file and match
+ * caps, and skips dependency and build directories.
+ */
+export async function searchWorkspace(tools: ToolSet, query: string, root = ''): Promise<string[]> {
+  const needle = query.toLowerCase()
+  const matches: string[] = []
+  const queue: string[] = [root]
+  let filesScanned = 0
+
+  while (
+    queue.length > 0 &&
+    filesScanned < SEARCH_MAX_FILES &&
+    matches.length < SEARCH_MAX_MATCHES
+  ) {
+    const dir = queue.shift() ?? ''
+    let entries
+    try {
+      entries = await tools.fs.list(dir)
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      if (entry.type === 'dir') {
+        if (!SEARCH_SKIP_DIRS.has(entry.name)) queue.push(entry.path)
+        continue
+      }
+      if (filesScanned >= SEARCH_MAX_FILES || matches.length >= SEARCH_MAX_MATCHES) break
+      filesScanned += 1
+      let contents: string
+      try {
+        contents = await tools.fs.read(entry.path)
+      } catch {
+        continue
+      }
+      const lines = contents.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i] ?? ''
+        if (line.toLowerCase().includes(needle)) {
+          matches.push(`${entry.path}:${i + 1}: ${line.trim().slice(0, 160)}`)
+          if (matches.length >= SEARCH_MAX_MATCHES) break
+        }
+      }
+    }
+  }
+  return matches
+}
+
+const REPO_MAP_EXTS = new Set([
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'mjs',
+  'cjs',
+  'py',
+  'go',
+  'rs',
+  'vue',
+  'svelte',
+])
+const REPO_MAP_MAX_FILES = 200
+const REPO_MAP_MAX_SYMBOLS = 12
+
+/** Pull the top-level function/class/def names out of a source file, cheaply and by regex. */
+function extractSymbols(contents: string): string[] {
+  const patterns = [
+    /export\s+(?:async\s+)?function\s+(\w+)/g,
+    /export\s+(?:abstract\s+)?class\s+(\w+)/g,
+    /export\s+const\s+(\w+)/g,
+    /^\s*(?:async\s+)?function\s+(\w+)/gm,
+    /^\s*class\s+(\w+)/gm,
+    /^\s*def\s+(\w+)/gm, // python
+    /^\s*func\s+(\w+)/gm, // go
+  ]
+  const seen = new Set<string>()
+  for (const re of patterns) {
+    let m: RegExpExecArray | null
+    while ((m = re.exec(contents)) !== null) {
+      const name = m[1]
+      if (name && !seen.has(name)) seen.add(name)
+      if (seen.size >= REPO_MAP_MAX_SYMBOLS) break
+    }
+    if (seen.size >= REPO_MAP_MAX_SYMBOLS) break
+  }
+  return [...seen]
+}
+
+/**
+ * A compact overview of the workspace: each source file with its top-level functions and
+ * classes. Codebase grounding so the agent can orient in an unfamiliar project before reading
+ * files one by one. Provider-agnostic (walks the filesystem tool), skips dependency and build
+ * directories, and only looks at recognized source extensions.
+ */
+export async function buildRepoMap(tools: ToolSet, root = ''): Promise<string> {
+  const queue: string[] = [root]
+  const lines: string[] = []
+  let filesScanned = 0
+
+  while (queue.length > 0 && filesScanned < REPO_MAP_MAX_FILES) {
+    const dir = queue.shift() ?? ''
+    let entries
+    try {
+      entries = await tools.fs.list(dir)
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      if (entry.type === 'dir') {
+        if (!SEARCH_SKIP_DIRS.has(entry.name)) queue.push(entry.path)
+        continue
+      }
+      const ext = entry.name.includes('.') ? (entry.name.split('.').pop() ?? '') : ''
+      if (!REPO_MAP_EXTS.has(ext)) continue
+      if (filesScanned >= REPO_MAP_MAX_FILES) break
+      filesScanned += 1
+      let contents: string
+      try {
+        contents = await tools.fs.read(entry.path)
+      } catch {
+        continue
+      }
+      const symbols = extractSymbols(contents)
+      lines.push(symbols.length > 0 ? `${entry.path}: ${symbols.join(', ')}` : entry.path)
+    }
+  }
+
+  return lines.length > 0 ? lines.sort().join('\n') : '(no source files found)'
 }
 
 /**
@@ -173,6 +420,12 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
   let ok = true
   let finalText = ''
   let usedTools = false
+  let prevFingerprint = ''
+  let repeatCount = 0
+  let madeEdits = false
+  let blockedOnce = false
+  let reparseAttempts = 0
+  let turnCheckpoint: string | null = null
 
   for (let step = 0; step < maxSteps; step++) {
     if (signal?.aborted) {
@@ -183,7 +436,11 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
 
     let raw: string
     try {
-      raw = await opts.llm.complete({ model: opts.model, messages, signal })
+      raw = await opts.llm.complete({
+        model: opts.model,
+        messages: compactMessages(messages),
+        signal,
+      })
     } catch (err) {
       if (signal?.aborted) {
         emit({ type: 'message', text: 'Run cancelled.' })
@@ -199,6 +456,19 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
     messages.push({ role: 'assistant', content: raw })
 
     if (!call) {
+      // A malformed tool call should not silently end the task. If the output looks like an
+      // attempted tool call, ask the model to re-send valid JSON (bounded, so genuine prose
+      // still ends the turn).
+      if (looksLikeToolAttempt(raw) && reparseAttempts < MAX_REPARSE_ATTEMPTS) {
+        reparseAttempts += 1
+        emit({ type: 'message', text: 'Fixing a malformed tool call.', agent: 'orchestrator' })
+        messages.push({
+          role: 'user',
+          content:
+            'Your last message looked like a tool call but was not valid JSON. Reply with ONLY a single valid JSON object like {"tool": "<name>", "args": { ... }} and nothing else.',
+        })
+        continue
+      }
       // Plain prose: a chat answer or a final explanation. End the turn.
       finalText = raw.trim()
       if (finalText) emit({ type: 'message', text: finalText, agent: 'orchestrator' })
@@ -209,11 +479,100 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
 
     if (call.tool === 'finish') {
       finalText = str(call.args.summary)
+      // Ronald verifies the work before the agent is allowed to declare it done. Only when
+      // edits were actually made, and only blocks once so the loop always terminates.
+      if (opts.verify && madeEdits) {
+        let verdict: { ok: boolean; summary: string }
+        try {
+          verdict = await opts.verify()
+        } catch (err) {
+          // A verifier that cannot run never blocks shipping; report it honestly instead.
+          verdict = {
+            ok: true,
+            summary: `verification could not run: ${err instanceof Error ? err.message : String(err)}`,
+          }
+        }
+        if (!verdict.ok && !blockedOnce) {
+          blockedOnce = true
+          emit({
+            type: 'message',
+            text: 'Ronald found problems, so I am not finishing yet.',
+            agent: 'verifier',
+          })
+          messages.push({
+            role: 'user',
+            content: `Observation from verify: the build is not green yet. ${verdict.summary} Fix these, then finish.`,
+          })
+          continue
+        }
+        if (!verdict.ok) {
+          // Already gave one chance to fix; finish, but be honest about the failing checks.
+          finalText =
+            `${finalText}\n\nHeads up: some checks are still failing. ${verdict.summary}`.trim()
+        }
+      }
       if (finalText) emit({ type: 'message', text: finalText, agent: 'orchestrator' })
       break
     }
 
+    if (call.tool === 'revert') {
+      usedTools = true
+      let observation: string
+      if (turnCheckpoint !== null) {
+        try {
+          await tools.restore(turnCheckpoint)
+          madeEdits = false
+          emit({ type: 'message', text: 'Reverted the changes from this attempt.', agent: 'coder' })
+          observation = 'reverted all changes from this turn back to the starting state'
+        } catch (err) {
+          observation = `error: could not revert: ${err instanceof Error ? err.message : String(err)}`
+        }
+      } else {
+        observation = 'nothing to revert; no changes have been made this turn'
+      }
+      messages.push({ role: 'user', content: `Observation from revert: ${observation}` })
+      continue
+    }
+
     usedTools = true
+
+    // Stuck detection: three identical tool calls in a row with no intervening progress
+    // means the agent is looping. Refuse to run it again and nudge it to change course
+    // (a warning alone gets ignored; not executing is what breaks the loop).
+    const sig = fingerprint(call)
+    if (sig === prevFingerprint) {
+      repeatCount += 1
+    } else {
+      repeatCount = 0
+      prevFingerprint = sig
+    }
+    if (repeatCount >= 2) {
+      emit({
+        type: 'message',
+        text: 'Stopping a repeated action that was not making progress.',
+        agent: 'orchestrator',
+      })
+      messages.push({
+        role: 'user',
+        content:
+          `Observation from ${call.tool}: you have repeated the exact same ${call.tool} call ${repeatCount + 1} times in a row with no change. ` +
+          'That is not making progress. Try a different approach, gather more context, or call finish if you are blocked.',
+      })
+      continue
+    }
+
+    // One-time per-turn checkpoint before the first edit, so revert can return to the start.
+    if (
+      turnCheckpoint === null &&
+      (call.tool === 'write_file' || call.tool === 'edit_file' || call.tool === 'delete_file')
+    ) {
+      try {
+        turnCheckpoint = await tools.checkpoint()
+      } catch {
+        turnCheckpoint = null
+      }
+    }
+
     let observation: string
     try {
       observation = await runTool(call, tools, approvals, emit, {
@@ -224,7 +583,23 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
     } catch (err) {
       observation = `error: ${err instanceof Error ? err.message : String(err)}`
     }
-    messages.push({ role: 'user', content: `Observation from ${call.tool}: ${truncate(observation)}` })
+
+    // Track real edits so verification only gates finish when the workspace actually changed.
+    if (
+      (call.tool === 'write_file' || call.tool === 'edit_file' || call.tool === 'delete_file') &&
+      !observation.startsWith('error') &&
+      !observation.startsWith('write rejected') &&
+      !observation.startsWith('edit rejected') &&
+      !observation.startsWith('delete rejected') &&
+      !observation.startsWith('no change')
+    ) {
+      madeEdits = true
+    }
+
+    messages.push({
+      role: 'user',
+      content: `Observation from ${call.tool}: ${truncate(observation)}`,
+    })
 
     if (step === maxSteps - 1) {
       emit({
@@ -265,7 +640,8 @@ async function runTool(
     case 'ask': {
       const question = str(call.args.question)
       if (!question) return 'error: ask needs a question'
-      if (!ctx.questions) return 'asking is not available in this run; proceed with your best assumption'
+      if (!ctx.questions)
+        return 'asking is not available in this run; proceed with your best assumption'
       const rawOptions = Array.isArray(call.args.options) ? call.args.options : []
       const options = rawOptions.map((o) => String(o)).filter(Boolean)
       const id = `ask_${ctx.stepId}`
@@ -295,6 +671,38 @@ async function runTool(
       return entries.map((e) => `${e.type === 'dir' ? 'dir ' : 'file'} ${e.path}`).join('\n')
     }
 
+    case 'search': {
+      const query = str(call.args.query)
+      if (!query) return 'error: search needs a query'
+      const matches = await searchWorkspace(tools, query, str(call.args.path))
+      if (matches.length === 0) return `no matches for "${query}"`
+      const note =
+        matches.length >= SEARCH_MAX_MATCHES ? `\n...(showing the first ${SEARCH_MAX_MATCHES})` : ''
+      const plural = matches.length === 1 ? '' : 'es'
+      return `${matches.length} match${plural} for "${query}":\n${matches.join('\n')}${note}`
+    }
+
+    case 'repo_map': {
+      return buildRepoMap(tools, str(call.args.path))
+    }
+
+    case 'skill': {
+      const name = str(call.args.name)
+      if (!name) {
+        return `available skills:\n${listSkills()
+          .map((s) => `- ${s.name}: ${s.description}`)
+          .join('\n')}`
+      }
+      const skill = getSkill(name)
+      if (!skill) {
+        return `unknown skill "${name}". available: ${listSkills()
+          .map((s) => s.name)
+          .join(', ')}`
+      }
+      emit({ type: 'message', text: `Loading the ${skill.label} skill.`, agent: 'orchestrator' })
+      return `${skill.label} skill loaded. Apply this to the current workspace:\n${skill.directive}`
+    }
+
     case 'write_file': {
       const path = str(call.args.path)
       const contents = str(call.args.contents)
@@ -322,6 +730,56 @@ async function runTool(
         agent: 'coder',
       })
       return `wrote ${contents.length} chars to ${path}`
+    }
+
+    case 'edit_file': {
+      const path = str(call.args.path)
+      if (!path) return 'error: edit_file needs a path'
+      const blocks = parseEditBlocks(call.args)
+      if (blocks.length === 0) return 'error: edit_file needs at least one { search, replace } edit'
+
+      let before: string
+      try {
+        before = await tools.fs.read(path)
+      } catch {
+        return `error: ${path} does not exist; use write_file to create it`
+      }
+
+      const applied = applyEdits(before, blocks)
+      if (!applied.ok) return `error: ${applied.reason}`
+      const after = applied.contents
+      if (after === before) return `no change: that edit left ${path} identical`
+
+      if (requireWriteApproval) {
+        const id = `edit:${path}`
+        emit({ type: 'approval', id, action: 'Edit file', detail: path })
+        const approved = await approvals.request(id)
+        if (!approved) return 'edit rejected by the user'
+      }
+
+      await tools.fs.write(path, after)
+      emit({ type: 'edit', path, diff: unifiedDiff(path, before, after), before, agent: 'coder' })
+      const plural = blocks.length > 1 ? 's' : ''
+      return `edited ${path} (${blocks.length} change${plural}, ${applied.strategy} match)`
+    }
+
+    case 'delete_file': {
+      const path = str(call.args.path)
+      if (!path) return 'error: delete_file needs a path'
+      try {
+        await tools.fs.read(path)
+      } catch {
+        return `error: ${path} does not exist`
+      }
+      if (requireWriteApproval) {
+        const id = `delete:${path}`
+        emit({ type: 'approval', id, action: 'Delete file', detail: path })
+        const approved = await approvals.request(id)
+        if (!approved) return 'delete rejected by the user'
+      }
+      await tools.fs.delete(path)
+      emit({ type: 'message', text: `Deleted ${path}.`, agent: 'coder' })
+      return `deleted ${path}`
     }
 
     case 'run': {
