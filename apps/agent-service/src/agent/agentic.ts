@@ -33,6 +33,9 @@ const MAX_OBSERVATION_CHARS = 6000
 /** Rough character budget for the working transcript sent to the model on a single turn. */
 const MAX_CONTEXT_CHARS = 48_000
 
+/** How many times one turn will re-prompt a model that emits a malformed tool call. */
+const MAX_REPARSE_ATTEMPTS = 2
+
 export const AGENTIC_SYSTEM_PROMPT = `You are Ronald, the SaaSyToad Forge coding agent, working inside an isolated sandbox workspace.
 
 You can use tools to inspect and change the workspace, and to ask the user questions. To call a tool, reply with ONLY a single JSON object, nothing else:
@@ -134,6 +137,16 @@ function extractFirstJsonObject(text: string): string | null {
   return null
 }
 
+/** Remove trailing commas before a closing } or ], a common model JSON error. */
+function stripTrailingCommas(s: string): string {
+  return s.replace(/,(\s*[}\]])/g, '$1')
+}
+
+/** True when output looks like an attempted (but unparseable) tool call rather than prose. */
+export function looksLikeToolAttempt(raw: string): boolean {
+  return raw.includes('{') && /"tool"\s*:/.test(raw)
+}
+
 /** Interpret model output as a tool call, or null when it is a plain prose reply. */
 export function parseToolCall(raw: string): ToolCall | null {
   const candidates: string[] = []
@@ -148,7 +161,12 @@ export function parseToolCall(raw: string): ToolCall | null {
     try {
       parsed = JSON.parse(candidate)
     } catch {
-      continue
+      // Forgive a common formatting slip (a trailing comma) before giving up on this candidate.
+      try {
+        parsed = JSON.parse(stripTrailingCommas(candidate))
+      } catch {
+        continue
+      }
     }
     if (!parsed || typeof parsed !== 'object') continue
     const obj = parsed as Record<string, unknown>
@@ -316,6 +334,7 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
   let repeatCount = 0
   let madeEdits = false
   let blockedOnce = false
+  let reparseAttempts = 0
 
   for (let step = 0; step < maxSteps; step++) {
     if (signal?.aborted) {
@@ -346,6 +365,19 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
     messages.push({ role: 'assistant', content: raw })
 
     if (!call) {
+      // A malformed tool call should not silently end the task. If the output looks like an
+      // attempted tool call, ask the model to re-send valid JSON (bounded, so genuine prose
+      // still ends the turn).
+      if (looksLikeToolAttempt(raw) && reparseAttempts < MAX_REPARSE_ATTEMPTS) {
+        reparseAttempts += 1
+        emit({ type: 'message', text: 'Fixing a malformed tool call.', agent: 'orchestrator' })
+        messages.push({
+          role: 'user',
+          content:
+            'Your last message looked like a tool call but was not valid JSON. Reply with ONLY a single valid JSON object like {"tool": "<name>", "args": { ... }} and nothing else.',
+        })
+        continue
+      }
       // Plain prose: a chat answer or a final explanation. End the turn.
       finalText = raw.trim()
       if (finalText) emit({ type: 'message', text: finalText, agent: 'orchestrator' })

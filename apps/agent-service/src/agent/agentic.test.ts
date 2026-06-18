@@ -61,6 +61,12 @@ describe('parseToolCall', () => {
   it('ignores JSON with an unknown tool', () => {
     expect(parseToolCall('{"tool":"delete_everything","args":{}}')).toBeNull()
   })
+
+  it('tolerates a trailing comma in the tool JSON', () => {
+    const call = parseToolCall('{"tool":"run","args":{"cmd":"ls",}}')
+    expect(call?.tool).toBe('run')
+    expect(call?.args.cmd).toBe('ls')
+  })
 })
 
 describe('runAgentic', () => {
@@ -194,6 +200,22 @@ describe('runAgentic', () => {
 
     expect(result.ok).toBe(true)
     expect(events.some((e) => e.type === 'edit')).toBe(false)
+  })
+
+  it('recovers from a malformed tool call instead of ending the turn', async () => {
+    const { events, result } = await setup(
+      [
+        '{"tool": "run", "args": {"cmd": "ls"', // looks like a tool call but is invalid JSON
+        '{"tool":"finish","args":{"summary":"ok"}}',
+      ],
+      'do something',
+    )
+
+    expect(result.ok).toBe(true)
+    expect(events.some((e) => e.type === 'message' && /malformed tool call/i.test(e.text))).toBe(
+      true,
+    )
+    expect(events.at(-1)).toEqual({ type: 'done', ok: true })
   })
 
   it('stops a tool call repeated three times in a row', async () => {
