@@ -50,7 +50,7 @@ Tools:
 - list_dir    args: { "path": string }                      list a directory ("" for the root)
 - search      args: { "query": string, "path"?: string }     find text across the workspace; use this to locate code before editing
 - repo_map    args: { "path"?: string }                      overview of source files and their top-level functions and classes; use it to orient in an unfamiliar workspace
-- skill       args: { "name"?: string }                      load expert guidance for a specialized job (seo-optimize, mobile-optimize, a11y-audit, perf-optimize, security-harden); call with no name to list them
+- skill       args: { "name"?: string }                      load an expert checklist for a specialized job (SEO, mobile, accessibility, performance, security, tdd, debugging, code review, refactoring, architecture, prototyping, frontend design, copywriting, Next.js, Supabase, API design); call with no name to list them all
 - write_file  args: { "path": string, "contents": string }  create a new file or replace one entirely
 - edit_file   args: { "path": string, "edits": [{ "search": string, "replace": string }] }  change parts of an existing file; each edit swaps the exact "search" text for "replace"
 - delete_file args: { "path": string }                      delete a file from the workspace

@@ -26,6 +26,6 @@ describe('forge skills', () => {
       // brand: no em or en dashes in agent-facing copy
       expect(skill.directive.includes('—') || skill.directive.includes('–')).toBe(false)
     }
-    expect(listSkills().length).toBeGreaterThanOrEqual(5)
+    expect(listSkills().length).toBeGreaterThanOrEqual(12)
   })
 })
