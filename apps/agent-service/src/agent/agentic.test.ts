@@ -374,6 +374,32 @@ describe('runAgentic', () => {
     await expect(provider.readFile(sandbox.id, 'old.js')).rejects.toThrow(/no such file/)
     expect(events.some((e) => e.type === 'message' && /Deleted old\.js/.test(e.text))).toBe(true)
   })
+
+  it('reverts this turn changes back to the starting state with the revert tool', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const events: AgentEvent[] = []
+
+    const opts: AgenticOptions = {
+      task: 'build then bail',
+      llm: new ScriptedLlm([
+        '{"tool":"write_file","args":{"path":"a.js","contents":"x"}}',
+        '{"tool":"revert","args":{}}',
+        '{"tool":"finish","args":{"summary":"reverted"}}',
+      ]),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals: new ApprovalGate(),
+      history: [],
+    }
+
+    const result = await runAgentic(opts, (e) => events.push(e))
+    expect(result.ok).toBe(true)
+    // The checkpoint was taken before the write, so reverting removes the file.
+    await expect(provider.readFile(sandbox.id, 'a.js')).rejects.toThrow(/no such file/)
+    expect(events.some((e) => e.type === 'message' && /Reverted/i.test(e.text))).toBe(true)
+  })
 })
 
 describe('searchWorkspace', () => {

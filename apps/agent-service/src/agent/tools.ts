@@ -27,6 +27,9 @@ export interface ToolSet {
   fs: FsTool
   terminal: TerminalTool
   browser: BrowserTool
+  /** Snapshot the workspace; returns a ref that restore() can roll back to. */
+  checkpoint(): Promise<string>
+  restore(ref: string): Promise<void>
 }
 
 export function createToolSet(
@@ -44,6 +47,8 @@ export function createToolSet(
     },
     terminal: { exec: (cmd) => provider.exec(sandboxId, cmd) },
     browser,
+    checkpoint: () => provider.checkpoint(sandboxId),
+    restore: (ref) => provider.restore(sandboxId, ref),
   }
 }
 

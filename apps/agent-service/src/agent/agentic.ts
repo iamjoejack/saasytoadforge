@@ -26,6 +26,7 @@ const KNOWN_TOOLS = new Set([
   'run',
   'screenshot',
   'ask',
+  'revert',
   'finish',
 ])
 
@@ -53,6 +54,7 @@ Tools:
 - run         args: { "cmd": string }                        run a shell command (tests, build, grep, install, etc.)
 - screenshot  args: { "path": string, "label": string }      render an HTML file and capture it
 - ask         args: { "question": string, "options"?: string[], "multiSelect"?: boolean }  ask the user; the answer comes back as the observation
+- revert       args: {}                                       undo all of your changes this turn and return the workspace to how it started; use it if your approach went wrong
 - finish      args: { "summary": string }                    end the task with a short summary
 
 Rules:
@@ -419,6 +421,7 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
   let madeEdits = false
   let blockedOnce = false
   let reparseAttempts = 0
+  let turnCheckpoint: string | null = null
 
   for (let step = 0; step < maxSteps; step++) {
     if (signal?.aborted) {
@@ -508,6 +511,25 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
       break
     }
 
+    if (call.tool === 'revert') {
+      usedTools = true
+      let observation: string
+      if (turnCheckpoint !== null) {
+        try {
+          await tools.restore(turnCheckpoint)
+          madeEdits = false
+          emit({ type: 'message', text: 'Reverted the changes from this attempt.', agent: 'coder' })
+          observation = 'reverted all changes from this turn back to the starting state'
+        } catch (err) {
+          observation = `error: could not revert: ${err instanceof Error ? err.message : String(err)}`
+        }
+      } else {
+        observation = 'nothing to revert; no changes have been made this turn'
+      }
+      messages.push({ role: 'user', content: `Observation from revert: ${observation}` })
+      continue
+    }
+
     usedTools = true
 
     // Stuck detection: three identical tool calls in a row with no intervening progress
@@ -533,6 +555,18 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
           'That is not making progress. Try a different approach, gather more context, or call finish if you are blocked.',
       })
       continue
+    }
+
+    // One-time per-turn checkpoint before the first edit, so revert can return to the start.
+    if (
+      turnCheckpoint === null &&
+      (call.tool === 'write_file' || call.tool === 'edit_file' || call.tool === 'delete_file')
+    ) {
+      try {
+        turnCheckpoint = await tools.checkpoint()
+      } catch {
+        turnCheckpoint = null
+      }
     }
 
     let observation: string
