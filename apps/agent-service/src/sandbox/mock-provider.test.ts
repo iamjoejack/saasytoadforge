@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseServerEnv } from '@forge/shared'
-import { MockSandboxProvider, createSandboxProvider } from './index'
+import { MockSandboxProvider, E2BSandboxProvider, createSandboxProvider } from './index'
 
 async function freshSandbox() {
   const provider = new MockSandboxProvider()
@@ -155,5 +155,10 @@ describe('createSandboxProvider', () => {
   it('falls back to mock when e2b is selected without a key', () => {
     const env = parseServerEnv({ SANDBOX_PROVIDER: 'e2b' } as NodeJS.ProcessEnv)
     expect(createSandboxProvider(env)).toBeInstanceOf(MockSandboxProvider)
+  })
+
+  it('auto-upgrades to E2B when a key is present, even on the default provider', () => {
+    const env = parseServerEnv({ E2B_API_KEY: 'e2b-test-key' } as NodeJS.ProcessEnv)
+    expect(createSandboxProvider(env)).toBeInstanceOf(E2BSandboxProvider)
   })
 })

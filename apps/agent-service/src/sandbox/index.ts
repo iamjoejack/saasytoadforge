@@ -26,6 +26,13 @@ export function createSandboxProvider(env: ServerEnv): SandboxProvider {
       console.warn('[sandbox] Daytona provider not yet implemented; using mock provider')
       return new MockSandboxProvider()
     case 'mock':
+      // Real execution whenever a key is available: an E2B key alone upgrades the default
+      // mock to a real microVM, so users get real builds, tests, and deploys without also
+      // having to flip SANDBOX_PROVIDER. No key means we stay quietly on the mock.
+      if (env.E2B_API_KEY) {
+        console.info('[sandbox] E2B_API_KEY present; using the real E2B sandbox.')
+        return new E2BSandboxProvider(env.E2B_API_KEY)
+      }
       return new MockSandboxProvider()
   }
 }
