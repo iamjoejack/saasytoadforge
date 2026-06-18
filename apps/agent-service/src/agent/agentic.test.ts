@@ -206,4 +206,94 @@ describe('runAgentic', () => {
     expect(events.filter((e) => e.type === 'terminal').length).toBe(2)
     expect(events.some((e) => e.type === 'message' && /repeated action/i.test(e.text))).toBe(true)
   })
+
+  it('verifies before finishing and re-prompts once when the build is not green', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const events: AgentEvent[] = []
+    let verifyCalls = 0
+
+    const opts: AgenticOptions = {
+      task: 'build a thing',
+      llm: new ScriptedLlm([
+        '{"tool":"write_file","args":{"path":"a.js","contents":"x"}}',
+        '{"tool":"finish","args":{"summary":"done"}}',
+        '{"tool":"finish","args":{"summary":"fixed it"}}',
+      ]),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals: new ApprovalGate(),
+      history: [],
+      verify: async () => {
+        verifyCalls += 1
+        return verifyCalls === 1
+          ? { ok: false, summary: 'typecheck failed' }
+          : { ok: true, summary: 'all green' }
+      },
+    }
+
+    const result = await runAgentic(opts, (e) => events.push(e))
+    expect(result.ok).toBe(true)
+    expect(verifyCalls).toBe(2) // blocked once, then re-verified the fix
+    expect(events.some((e) => e.type === 'message' && /not finishing yet/i.test(e.text))).toBe(true)
+    expect(events.at(-1)).toEqual({ type: 'done', ok: true })
+  })
+
+  it('skips verification when no edits were made', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const events: AgentEvent[] = []
+    let verifyCalls = 0
+
+    const opts: AgenticOptions = {
+      task: 'just answer a question',
+      llm: new ScriptedLlm(['{"tool":"finish","args":{"summary":"nothing to build"}}']),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals: new ApprovalGate(),
+      history: [],
+      verify: async () => {
+        verifyCalls += 1
+        return { ok: false, summary: 'should not run' }
+      },
+    }
+
+    const result = await runAgentic(opts, (e) => events.push(e))
+    expect(result.ok).toBe(true)
+    expect(verifyCalls).toBe(0)
+  })
+
+  it('finishes after one block even if checks still fail, and says so honestly', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const events: AgentEvent[] = []
+    let verifyCalls = 0
+
+    const opts: AgenticOptions = {
+      task: 'build a thing',
+      llm: new ScriptedLlm([
+        '{"tool":"write_file","args":{"path":"a.js","contents":"x"}}',
+        '{"tool":"finish","args":{"summary":"done"}}',
+        '{"tool":"finish","args":{"summary":"still done"}}',
+      ]),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals: new ApprovalGate(),
+      history: [],
+      verify: async () => {
+        verifyCalls += 1
+        return { ok: false, summary: 'lint still failing' }
+      },
+    }
+
+    const result = await runAgentic(opts, (e) => events.push(e))
+    expect(result.ok).toBe(true)
+    expect(verifyCalls).toBe(2)
+    expect(
+      events.some((e) => e.type === 'message' && /checks are still failing/i.test(e.text)),
+    ).toBe(true)
+  })
 })

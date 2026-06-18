@@ -83,6 +83,12 @@ export interface AgenticOptions {
   history: LlmMessage[]
   /** Hard cap on tool iterations (default 16). */
   maxSteps?: number
+  /**
+   * Ronald's in-loop verification. When provided, the agent's `finish` is gated on it
+   * whenever edits were made: a failing verdict re-prompts the agent once to fix the build
+   * (it never hard-blocks past one attempt, so the loop always terminates).
+   */
+  verify?: () => Promise<{ ok: boolean; summary: string }>
 }
 
 export type Emit = (event: AgentEvent) => void
@@ -199,6 +205,8 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
   let usedTools = false
   let prevFingerprint = ''
   let repeatCount = 0
+  let madeEdits = false
+  let blockedOnce = false
 
   for (let step = 0; step < maxSteps; step++) {
     if (signal?.aborted) {
@@ -235,6 +243,38 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
 
     if (call.tool === 'finish') {
       finalText = str(call.args.summary)
+      // Ronald verifies the work before the agent is allowed to declare it done. Only when
+      // edits were actually made, and only blocks once so the loop always terminates.
+      if (opts.verify && madeEdits) {
+        let verdict: { ok: boolean; summary: string }
+        try {
+          verdict = await opts.verify()
+        } catch (err) {
+          // A verifier that cannot run never blocks shipping; report it honestly instead.
+          verdict = {
+            ok: true,
+            summary: `verification could not run: ${err instanceof Error ? err.message : String(err)}`,
+          }
+        }
+        if (!verdict.ok && !blockedOnce) {
+          blockedOnce = true
+          emit({
+            type: 'message',
+            text: 'Ronald found problems, so I am not finishing yet.',
+            agent: 'verifier',
+          })
+          messages.push({
+            role: 'user',
+            content: `Observation from verify: the build is not green yet. ${verdict.summary} Fix these, then finish.`,
+          })
+          continue
+        }
+        if (!verdict.ok) {
+          // Already gave one chance to fix; finish, but be honest about the failing checks.
+          finalText =
+            `${finalText}\n\nHeads up: some checks are still failing. ${verdict.summary}`.trim()
+        }
+      }
       if (finalText) emit({ type: 'message', text: finalText, agent: 'orchestrator' })
       break
     }
@@ -276,6 +316,18 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
     } catch (err) {
       observation = `error: ${err instanceof Error ? err.message : String(err)}`
     }
+
+    // Track real edits so verification only gates finish when the workspace actually changed.
+    if (
+      (call.tool === 'write_file' || call.tool === 'edit_file') &&
+      !observation.startsWith('error') &&
+      !observation.startsWith('write rejected') &&
+      !observation.startsWith('edit rejected') &&
+      !observation.startsWith('no change')
+    ) {
+      madeEdits = true
+    }
+
     messages.push({
       role: 'user',
       content: `Observation from ${call.tool}: ${truncate(observation)}`,
