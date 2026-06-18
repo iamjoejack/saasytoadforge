@@ -10,6 +10,7 @@ export interface FsTool {
   read(path: string): Promise<string>
   write(path: string, contents: string): Promise<void>
   list(dir: string): Promise<FileEntry[]>
+  delete(path: string): Promise<void>
 }
 
 export interface TerminalTool {
@@ -39,6 +40,7 @@ export function createToolSet(
       read: (path) => provider.readFile(sandboxId, assertSafePath(path)),
       write: (path, contents) => provider.writeFile(sandboxId, assertSafePath(path), contents),
       list: (dir) => provider.listFiles(sandboxId, dir === '' ? '' : assertSafePath(dir)),
+      delete: (path) => provider.deleteFile(sandboxId, assertSafePath(path)),
     },
     terminal: { exec: (cmd) => provider.exec(sandboxId, cmd) },
     browser,

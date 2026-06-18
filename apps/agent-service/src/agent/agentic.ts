@@ -19,6 +19,7 @@ const KNOWN_TOOLS = new Set([
   'read_file',
   'write_file',
   'edit_file',
+  'delete_file',
   'list_dir',
   'search',
   'run',
@@ -40,6 +41,7 @@ Tools:
 - search      args: { "query": string, "path"?: string }     find text across the workspace; use this to locate code before editing
 - write_file  args: { "path": string, "contents": string }  create a new file or replace one entirely
 - edit_file   args: { "path": string, "edits": [{ "search": string, "replace": string }] }  change parts of an existing file; each edit swaps the exact "search" text for "replace"
+- delete_file args: { "path": string }                      delete a file from the workspace
 - run         args: { "cmd": string }                        run a shell command (tests, build, grep, install, etc.)
 - screenshot  args: { "path": string, "label": string }      render an HTML file and capture it
 - ask         args: { "question": string, "options"?: string[], "multiSelect"?: boolean }  ask the user; the answer comes back as the observation
@@ -375,10 +377,11 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
 
     // Track real edits so verification only gates finish when the workspace actually changed.
     if (
-      (call.tool === 'write_file' || call.tool === 'edit_file') &&
+      (call.tool === 'write_file' || call.tool === 'edit_file' || call.tool === 'delete_file') &&
       !observation.startsWith('error') &&
       !observation.startsWith('write rejected') &&
       !observation.startsWith('edit rejected') &&
+      !observation.startsWith('delete rejected') &&
       !observation.startsWith('no change')
     ) {
       madeEdits = true
@@ -528,6 +531,25 @@ async function runTool(
       emit({ type: 'edit', path, diff: unifiedDiff(path, before, after), before, agent: 'coder' })
       const plural = blocks.length > 1 ? 's' : ''
       return `edited ${path} (${blocks.length} change${plural}, ${applied.strategy} match)`
+    }
+
+    case 'delete_file': {
+      const path = str(call.args.path)
+      if (!path) return 'error: delete_file needs a path'
+      try {
+        await tools.fs.read(path)
+      } catch {
+        return `error: ${path} does not exist`
+      }
+      if (requireWriteApproval) {
+        const id = `delete:${path}`
+        emit({ type: 'approval', id, action: 'Delete file', detail: path })
+        const approved = await approvals.request(id)
+        if (!approved) return 'delete rejected by the user'
+      }
+      await tools.fs.delete(path)
+      emit({ type: 'message', text: `Deleted ${path}.`, agent: 'coder' })
+      return `deleted ${path}`
     }
 
     case 'run': {

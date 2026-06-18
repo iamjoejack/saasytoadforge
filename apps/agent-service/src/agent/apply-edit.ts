@@ -97,9 +97,17 @@ export function applyEdit(content: string, block: EditBlock): ApplyResult {
     return { ok: true, contents: `${content}${sep}${replace}`, strategy: 'append' }
   }
 
-  // 1) Exact substring: preserves everything verbatim and catches intra-line edits.
+  // 1) Exact substring: preserves everything verbatim and catches intra-line edits. Require a
+  //    unique match so we never silently edit the wrong occurrence.
   const idx = content.indexOf(search)
   if (idx !== -1) {
+    if (content.indexOf(search, idx + 1) !== -1) {
+      return {
+        ok: false,
+        reason:
+          'search block matches more than once. Add a few surrounding lines so it identifies exactly one place.',
+      }
+    }
     return {
       ok: true,
       contents: content.slice(0, idx) + replace + content.slice(idx + search.length),

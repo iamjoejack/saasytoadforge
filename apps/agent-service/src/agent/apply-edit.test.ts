@@ -51,6 +51,12 @@ describe('applyEdit', () => {
     expect(res.ok).toBe(false)
     expect(!res.ok && res.reason).toContain('not found')
   })
+
+  it('refuses an edit whose search matches more than once', () => {
+    const res = applyEdit('x = 1\nx = 1\n', { search: 'x = 1', replace: 'x = 2' })
+    expect(res.ok).toBe(false)
+    expect(!res.ok && res.reason).toMatch(/more than once/)
+  })
 })
 
 describe('applyEdits', () => {

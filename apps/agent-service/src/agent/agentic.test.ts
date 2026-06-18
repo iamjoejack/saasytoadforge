@@ -320,6 +320,31 @@ describe('runAgentic', () => {
     expect(result.ok).toBe(true)
     expect(events.at(-1)).toEqual({ type: 'done', ok: true })
   })
+
+  it('deletes a file with delete_file', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    await provider.writeFile(sandbox.id, 'old.js', 'remove me\n')
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const events: AgentEvent[] = []
+
+    const opts: AgenticOptions = {
+      task: 'delete old.js',
+      llm: new ScriptedLlm([
+        '{"tool":"delete_file","args":{"path":"old.js"}}',
+        '{"tool":"finish","args":{"summary":"removed it"}}',
+      ]),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals: new ApprovalGate(),
+      history: [],
+    }
+
+    const result = await runAgentic(opts, (e) => events.push(e))
+    expect(result.ok).toBe(true)
+    await expect(provider.readFile(sandbox.id, 'old.js')).rejects.toThrow(/no such file/)
+    expect(events.some((e) => e.type === 'message' && /Deleted old\.js/.test(e.text))).toBe(true)
+  })
 })
 
 describe('searchWorkspace', () => {
