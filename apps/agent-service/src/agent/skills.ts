@@ -255,6 +255,47 @@ export const FORGE_SKILLS: ForgeSkill[] = [
       '- Rate-limit sensitive endpoints and document each one.',
     ),
   },
+  {
+    name: 'research-first',
+    label: 'Research before building',
+    description: 'Verify external APIs and versions before writing code, instead of guessing.',
+    directive: lines(
+      'Research before you build. Do not trust memory for anything external:',
+      '- Confirm the actual installed versions of frameworks and libraries, and read those version docs, since APIs differ between majors.',
+      '- For a third-party service, read the official SDK source before writing a client. Third-party docs and blog posts are often wrong.',
+      '- Use search, repo_map, and file reads to gather the unknowns before writing code.',
+      '- Prefer the official, maintained library over a hand-rolled integration.',
+      '- Note what you verified and what is still an assumption.',
+    ),
+  },
+  {
+    name: 'mcp-server',
+    label: 'MCP server builder',
+    description: 'Build a Model Context Protocol server that exposes tools to an AI agent.',
+    directive: lines(
+      'Build a solid MCP server:',
+      '- Read the current MCP SDK docs first (Python FastMCP or the TypeScript MCP SDK), since the protocol and APIs change.',
+      '- Expose a small set of well-named tools, each with a clear description and a typed input schema.',
+      '- Validate every tool input and return structured, helpful errors.',
+      '- Keep tools focused and composable. Avoid one giant do-everything tool.',
+      '- Handle auth and secrets server-side, and never leak credentials through a tool result.',
+      '- Test each tool in isolation, and document how to run and connect the server.',
+    ),
+  },
+  {
+    name: 'document-export',
+    label: 'Document export',
+    description: 'Add PDF, CSV, or spreadsheet export to the app you are building.',
+    directive: lines(
+      'Add document export to the built app the right way:',
+      '- Decide the format the user actually needs: PDF, CSV, or spreadsheet.',
+      '- For CSV, generate it server-side, escape fields correctly, and stream it.',
+      '- For PDF, use a maintained library, render server-side where possible, and bundle fonts and assets.',
+      '- For spreadsheets, use a maintained xlsx library and set column types and headers properly.',
+      '- Stream large exports rather than building them all in memory.',
+      '- Set the right content-type and content-disposition headers so the file downloads.',
+    ),
+  },
 ]
 
 export function listSkills(): ForgeSkill[] {
