@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { runAgenticEval } from './runner'
 
 // Drives the real agentic loop (runAgentic) so this is a true task-completion scoreboard
