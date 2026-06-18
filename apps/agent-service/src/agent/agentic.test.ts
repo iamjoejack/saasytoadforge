@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import type { AgentEvent } from '@forge/shared'
-import { runAgentic, parseToolCall, searchWorkspace, type AgenticOptions } from './agentic'
+import {
+  runAgentic,
+  parseToolCall,
+  searchWorkspace,
+  compactMessages,
+  type AgenticOptions,
+} from './agentic'
 import { ApprovalGate, QuestionGate } from './agent'
 import { createToolSet } from './tools'
 import { MockBrowserTool } from './tools'
@@ -380,5 +386,31 @@ describe('searchWorkspace', () => {
   it('returns nothing when there is no match', async () => {
     const tools = await workspaceWith({ 'a.txt': 'hello world\n' })
     expect(await searchWorkspace(tools, 'zzz')).toEqual([])
+  })
+})
+
+describe('compactMessages', () => {
+  it('returns the input unchanged when it fits the budget', () => {
+    const msgs: LlmMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'task' },
+      { role: 'assistant', content: 'ok' },
+    ]
+    expect(compactMessages(msgs, 1000)).toBe(msgs)
+  })
+
+  it('keeps the system prompt, the task, and recent messages, omitting the middle', () => {
+    const big = 'x'.repeat(200)
+    const msgs: LlmMessage[] = [
+      { role: 'system', content: 'SYSTEM' },
+      { role: 'user', content: 'TASK' },
+      ...Array.from({ length: 20 }, (_, k) => ({ role: 'user' as const, content: `${big}#${k}` })),
+    ]
+    const out = compactMessages(msgs, 600)
+    expect(out[0]?.content).toBe('SYSTEM') // system prompt kept
+    expect(out[1]?.content).toBe('TASK') // original task kept
+    expect(out.some((m) => /earlier step/.test(m.content))).toBe(true) // middle summarized
+    expect(out.length).toBeLessThan(msgs.length)
+    expect(out.at(-1)?.content).toContain('#19') // most recent message preserved
   })
 })

@@ -30,6 +30,9 @@ const KNOWN_TOOLS = new Set([
 
 const MAX_OBSERVATION_CHARS = 6000
 
+/** Rough character budget for the working transcript sent to the model on a single turn. */
+const MAX_CONTEXT_CHARS = 48_000
+
 export const AGENTIC_SYSTEM_PROMPT = `You are Ronald, the SaaSyToad Forge coding agent, working inside an isolated sandbox workspace.
 
 You can use tools to inspect and change the workspace, and to ask the user questions. To call a tool, reply with ONLY a single JSON object, nothing else:
@@ -166,6 +169,54 @@ function truncate(text: string): string {
   return `${text.slice(0, MAX_OBSERVATION_CHARS)}\n...[truncated ${text.length - MAX_OBSERVATION_CHARS} chars]`
 }
 
+/**
+ * Keep the working transcript within a rough character budget on long turns. Preserves the
+ * system prompt and the original task, keeps the most recent messages in full, and replaces
+ * the older middle with a short placeholder. This is the cheap "snip" tier of compaction: no
+ * LLM call, and no loss of the load-bearing head or the recent context. Returns the input
+ * unchanged when it already fits.
+ */
+export function compactMessages(
+  messages: LlmMessage[],
+  maxChars = MAX_CONTEXT_CHARS,
+): LlmMessage[] {
+  const total = messages.reduce((n, m) => n + m.content.length, 0)
+  if (total <= maxChars) return messages
+
+  // Always keep the system message(s) and the first user message (the task).
+  const head: LlmMessage[] = []
+  let i = 0
+  while (i < messages.length && messages[i]?.role === 'system') {
+    head.push(messages[i] as LlmMessage)
+    i++
+  }
+  if (i < messages.length) {
+    head.push(messages[i] as LlmMessage)
+    i++
+  }
+
+  // Keep as many of the most recent messages as fit in the remaining budget.
+  const headChars = head.reduce((n, m) => n + m.content.length, 0)
+  const budget = Math.max(0, maxChars - headChars)
+  const tail: LlmMessage[] = []
+  let used = 0
+  for (let j = messages.length - 1; j >= i; j--) {
+    const m = messages[j] as LlmMessage
+    if (tail.length > 0 && used + m.content.length > budget) break
+    tail.unshift(m)
+    used += m.content.length
+  }
+
+  const omitted = messages.length - head.length - tail.length
+  if (omitted <= 0) return messages
+
+  const note: LlmMessage = {
+    role: 'user',
+    content: `[${omitted} earlier step${omitted === 1 ? '' : 's'} omitted to stay within the context budget. Read files again if you need detail from them.]`,
+  }
+  return [...head, note, ...tail]
+}
+
 function str(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
@@ -275,7 +326,11 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
 
     let raw: string
     try {
-      raw = await opts.llm.complete({ model: opts.model, messages, signal })
+      raw = await opts.llm.complete({
+        model: opts.model,
+        messages: compactMessages(messages),
+        signal,
+      })
     } catch (err) {
       if (signal?.aborted) {
         emit({ type: 'message', text: 'Run cancelled.' })
