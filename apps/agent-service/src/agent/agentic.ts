@@ -4,6 +4,7 @@ import type { ToolSet } from './tools'
 import type { ApprovalGate, QuestionGate } from './agent'
 import { unifiedDiff } from './diff'
 import { applyEdits, type EditBlock } from './apply-edit'
+import { getSkill, listSkills } from './skills'
 
 /**
  * A provider-agnostic agentic loop. The model either calls a tool (by replying with a
@@ -23,6 +24,7 @@ const KNOWN_TOOLS = new Set([
   'list_dir',
   'search',
   'repo_map',
+  'skill',
   'run',
   'screenshot',
   'ask',
@@ -48,6 +50,7 @@ Tools:
 - list_dir    args: { "path": string }                      list a directory ("" for the root)
 - search      args: { "query": string, "path"?: string }     find text across the workspace; use this to locate code before editing
 - repo_map    args: { "path"?: string }                      overview of source files and their top-level functions and classes; use it to orient in an unfamiliar workspace
+- skill       args: { "name"?: string }                      load expert guidance for a specialized job (seo-optimize, mobile-optimize, a11y-audit, perf-optimize, security-harden); call with no name to list them
 - write_file  args: { "path": string, "contents": string }  create a new file or replace one entirely
 - edit_file   args: { "path": string, "edits": [{ "search": string, "replace": string }] }  change parts of an existing file; each edit swaps the exact "search" text for "replace"
 - delete_file args: { "path": string }                      delete a file from the workspace
@@ -62,6 +65,7 @@ Rules:
 - Use the right integration for the job. When a task needs a database, payments, email, automation, or hosting, wire up the connector that is available in this workspace (listed below) rather than rolling your own.
 - Paths are workspace-relative. Never use "../" or absolute paths.
 - To change an existing file, prefer edit_file: read the file first, then copy the exact text you want to change into "search" (no line numbers) and the new version into "replace". Keep each search block small and unique. Use write_file only to create a new file or replace one entirely.
+- For a specialized job like SEO or mobile optimization, call the skill tool first to load the right expert checklist, then apply it.
 - When the task is done, call finish with a brief plain-language summary.
 - If the user is just chatting or asking a question that needs no tools, reply in plain prose instead of JSON.
 
@@ -680,6 +684,23 @@ async function runTool(
 
     case 'repo_map': {
       return buildRepoMap(tools, str(call.args.path))
+    }
+
+    case 'skill': {
+      const name = str(call.args.name)
+      if (!name) {
+        return `available skills:\n${listSkills()
+          .map((s) => `- ${s.name}: ${s.description}`)
+          .join('\n')}`
+      }
+      const skill = getSkill(name)
+      if (!skill) {
+        return `unknown skill "${name}". available: ${listSkills()
+          .map((s) => s.name)
+          .join(', ')}`
+      }
+      emit({ type: 'message', text: `Loading the ${skill.label} skill.`, agent: 'orchestrator' })
+      return `${skill.label} skill loaded. Apply this to the current workspace:\n${skill.directive}`
     }
 
     case 'write_file': {

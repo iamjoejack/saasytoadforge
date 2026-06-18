@@ -326,6 +326,31 @@ describe('runAgentic', () => {
     ).toBe(true)
   })
 
+  it('loads a skill via the skill tool', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const events: AgentEvent[] = []
+
+    const opts: AgenticOptions = {
+      task: 'make my landing page rank on google',
+      llm: new ScriptedLlm([
+        '{"tool":"skill","args":{"name":"seo-optimize"}}',
+        '{"tool":"finish","args":{"summary":"applied SEO"}}',
+      ]),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals: new ApprovalGate(),
+      history: [],
+    }
+
+    const result = await runAgentic(opts, (e) => events.push(e))
+    expect(result.ok).toBe(true)
+    expect(events.some((e) => e.type === 'message' && /SEO optimizer skill/.test(e.text))).toBe(
+      true,
+    )
+  })
+
   it('can call the search tool and finish', async () => {
     const provider = new MockSandboxProvider()
     const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
