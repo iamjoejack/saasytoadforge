@@ -20,6 +20,7 @@ const KNOWN_TOOLS = new Set([
   'write_file',
   'edit_file',
   'list_dir',
+  'search',
   'run',
   'screenshot',
   'ask',
@@ -36,6 +37,7 @@ You can use tools to inspect and change the workspace, and to ask the user quest
 Tools:
 - read_file   args: { "path": string }                      read a workspace file
 - list_dir    args: { "path": string }                      list a directory ("" for the root)
+- search      args: { "query": string, "path"?: string }     find text across the workspace; use this to locate code before editing
 - write_file  args: { "path": string, "contents": string }  create a new file or replace one entirely
 - edit_file   args: { "path": string, "edits": [{ "search": string, "replace": string }] }  change parts of an existing file; each edit swaps the exact "search" text for "replace"
 - run         args: { "cmd": string }                        run a shell command (tests, build, grep, install, etc.)
@@ -44,7 +46,7 @@ Tools:
 - finish      args: { "summary": string }                    end the task with a short summary
 
 Rules:
-- Work in small steps. Read or list before you edit. After editing code, run the relevant tests or build to verify.
+- Work in small steps. Use search or list_dir to find the right file, and read it before you edit. After editing code, run the relevant tests or build to verify.
 - Use the right integration for the job. When a task needs a database, payments, email, automation, or hosting, wire up the connector that is available in this workspace (listed below) rather than rolling your own.
 - Paths are workspace-relative. Never use "../" or absolute paths.
 - To change an existing file, prefer edit_file: read the file first, then copy the exact text you want to change into "search" (no line numbers) and the new version into "replace". Keep each search block small and unique. Use write_file only to create a new file or replace one entirely.
@@ -185,6 +187,60 @@ function parseEditBlocks(args: Record<string, unknown>): EditBlock[] {
 /** A stable signature for a tool call, used to detect a stuck, repeating loop. */
 function fingerprint(call: ToolCall): string {
   return `${call.tool}:${JSON.stringify(call.args)}`
+}
+
+const SEARCH_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.cache'])
+const SEARCH_MAX_FILES = 300
+const SEARCH_MAX_MATCHES = 50
+
+/**
+ * Grep-style content search across the workspace, for codebase grounding: the agent locates
+ * code before editing instead of reading files blindly. Provider-agnostic (walks the
+ * filesystem tool, so it behaves the same on the mock and on E2B), bounded by file and match
+ * caps, and skips dependency and build directories.
+ */
+export async function searchWorkspace(tools: ToolSet, query: string, root = ''): Promise<string[]> {
+  const needle = query.toLowerCase()
+  const matches: string[] = []
+  const queue: string[] = [root]
+  let filesScanned = 0
+
+  while (
+    queue.length > 0 &&
+    filesScanned < SEARCH_MAX_FILES &&
+    matches.length < SEARCH_MAX_MATCHES
+  ) {
+    const dir = queue.shift() ?? ''
+    let entries
+    try {
+      entries = await tools.fs.list(dir)
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      if (entry.type === 'dir') {
+        if (!SEARCH_SKIP_DIRS.has(entry.name)) queue.push(entry.path)
+        continue
+      }
+      if (filesScanned >= SEARCH_MAX_FILES || matches.length >= SEARCH_MAX_MATCHES) break
+      filesScanned += 1
+      let contents: string
+      try {
+        contents = await tools.fs.read(entry.path)
+      } catch {
+        continue
+      }
+      const lines = contents.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i] ?? ''
+        if (line.toLowerCase().includes(needle)) {
+          matches.push(`${entry.path}:${i + 1}: ${line.trim().slice(0, 160)}`)
+          if (matches.length >= SEARCH_MAX_MATCHES) break
+        }
+      }
+    }
+  }
+  return matches
 }
 
 /**
@@ -401,6 +457,17 @@ async function runTool(
       const entries = await tools.fs.list(path)
       if (entries.length === 0) return '(empty directory)'
       return entries.map((e) => `${e.type === 'dir' ? 'dir ' : 'file'} ${e.path}`).join('\n')
+    }
+
+    case 'search': {
+      const query = str(call.args.query)
+      if (!query) return 'error: search needs a query'
+      const matches = await searchWorkspace(tools, query, str(call.args.path))
+      if (matches.length === 0) return `no matches for "${query}"`
+      const note =
+        matches.length >= SEARCH_MAX_MATCHES ? `\n...(showing the first ${SEARCH_MAX_MATCHES})` : ''
+      const plural = matches.length === 1 ? '' : 'es'
+      return `${matches.length} match${plural} for "${query}":\n${matches.join('\n')}${note}`
     }
 
     case 'write_file': {

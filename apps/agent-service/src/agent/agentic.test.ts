@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { AgentEvent } from '@forge/shared'
-import { runAgentic, parseToolCall, type AgenticOptions } from './agentic'
+import { runAgentic, parseToolCall, searchWorkspace, type AgenticOptions } from './agentic'
 import { ApprovalGate, QuestionGate } from './agent'
 import { createToolSet } from './tools'
 import { MockBrowserTool } from './tools'
@@ -295,5 +295,65 @@ describe('runAgentic', () => {
     expect(
       events.some((e) => e.type === 'message' && /checks are still failing/i.test(e.text)),
     ).toBe(true)
+  })
+
+  it('can call the search tool and finish', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    await provider.writeFile(sandbox.id, 'src/app.js', 'const secret = 42\n')
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const events: AgentEvent[] = []
+
+    const opts: AgenticOptions = {
+      task: 'find the secret',
+      llm: new ScriptedLlm([
+        '{"tool":"search","args":{"query":"secret"}}',
+        '{"tool":"finish","args":{"summary":"found it"}}',
+      ]),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals: new ApprovalGate(),
+      history: [],
+    }
+
+    const result = await runAgentic(opts, (e) => events.push(e))
+    expect(result.ok).toBe(true)
+    expect(events.at(-1)).toEqual({ type: 'done', ok: true })
+  })
+})
+
+describe('searchWorkspace', () => {
+  async function workspaceWith(files: Record<string, string>) {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    for (const [path, contents] of Object.entries(files)) {
+      await provider.writeFile(sandbox.id, path, contents)
+    }
+    return createToolSet(provider, sandbox.id, new MockBrowserTool())
+  }
+
+  it('finds matching lines, case-insensitive, with file and line number', async () => {
+    const tools = await workspaceWith({
+      'src/app.js': 'const port = 3000\nstartServer(port)\n',
+      'src/util.js': 'export const PORT = 3000\n',
+    })
+    const matches = await searchWorkspace(tools, 'port')
+    expect(matches.length).toBeGreaterThanOrEqual(3) // port, port, PORT
+    expect(matches.some((m) => /src\/app\.js:1:/.test(m))).toBe(true)
+  })
+
+  it('skips dependency directories like node_modules', async () => {
+    const tools = await workspaceWith({
+      'index.js': 'needle here\n',
+      'node_modules/dep/index.js': 'needle in deps\n',
+    })
+    const matches = await searchWorkspace(tools, 'needle')
+    expect(matches.length).toBe(1)
+    expect(matches.some((m) => m.includes('node_modules'))).toBe(false)
+  })
+
+  it('returns nothing when there is no match', async () => {
+    const tools = await workspaceWith({ 'a.txt': 'hello world\n' })
+    expect(await searchWorkspace(tools, 'zzz')).toEqual([])
   })
 })
