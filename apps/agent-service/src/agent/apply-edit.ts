@@ -66,14 +66,15 @@ function reindent(lines: string[], fromIndent: string, toIndent: string): string
   })
 }
 
-/** First start index where every search line matches the file under `eq`, or -1. */
+/** First start index at or after `from` where every search line matches the file under `eq`, or -1. */
 function findWindow(
   contentLines: string[],
   searchLines: string[],
   eq: (a: string, b: string) => boolean,
+  from = 0,
 ): number {
   if (searchLines.length === 0) return -1
-  for (let start = 0; start + searchLines.length <= contentLines.length; start++) {
+  for (let start = from; start + searchLines.length <= contentLines.length; start++) {
     let all = true
     for (let k = 0; k < searchLines.length; k++) {
       if (!eq(contentLines[start + k] ?? '', searchLines[k] ?? '')) {
@@ -117,11 +118,23 @@ export function applyEdit(content: string, block: EditBlock): ApplyResult {
 
   const contentLines = splitLines(content)
   const searchLines = dropTrailingBlank(splitLines(search))
-  const replaceLines = dropTrailingBlank(splitLines(replace))
+  // Keep the replacement verbatim so an intentional trailing blank line is preserved (the
+  // trailing-blank trim is only for matching the search block, never for the output).
+  const replaceLines = splitLines(replace)
+
+  // The fuzzy strategies must honor the same uniqueness rule as the exact path: if the looser
+  // match hits more than one place, refuse rather than silently editing the wrong one.
+  const ambiguous: ApplyResult = {
+    ok: false,
+    reason:
+      'search block matches more than once. Add a few surrounding lines so it identifies exactly one place.',
+  }
 
   // 2) Trailing-whitespace-insensitive. Leading indent still matches, so use the replacement verbatim.
-  let start = findWindow(contentLines, searchLines, (a, b) => trimEnd(a) === trimEnd(b))
+  const eqTrimEnd = (a: string, b: string): boolean => trimEnd(a) === trimEnd(b)
+  let start = findWindow(contentLines, searchLines, eqTrimEnd)
   if (start !== -1) {
+    if (findWindow(contentLines, searchLines, eqTrimEnd, start + 1) !== -1) return ambiguous
     const next = [
       ...contentLines.slice(0, start),
       ...replaceLines,
@@ -132,8 +145,10 @@ export function applyEdit(content: string, block: EditBlock): ApplyResult {
 
   // 3) Indentation-flexible: match on trimmed text, then re-indent the replacement from the
   //    search block's indentation to the file block's actual indentation.
-  start = findWindow(contentLines, searchLines, (a, b) => a.trim() === b.trim())
+  const eqTrim = (a: string, b: string): boolean => a.trim() === b.trim()
+  start = findWindow(contentLines, searchLines, eqTrim)
   if (start !== -1) {
+    if (findWindow(contentLines, searchLines, eqTrim, start + 1) !== -1) return ambiguous
     const matched = contentLines.slice(start, start + searchLines.length)
     const reindented = reindent(replaceLines, commonIndent(searchLines), commonIndent(matched))
     const next = [

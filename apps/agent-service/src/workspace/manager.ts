@@ -12,7 +12,7 @@ const STARTER_FILES: Readonly<Record<string, string>> = {
   'README.md':
     '# New Forge workspace\n\nDescribe a task in the agent panel and Forge will plan, edit, and verify it here.\n',
   'index.js': "console.log('hello from forge')\n",
-  'src/app.js': "export function greet(name) {\n  return `hi ${name}`\n}\n",
+  'src/app.js': 'export function greet(name) {\n  return `hi ${name}`\n}\n',
 }
 
 /**
@@ -31,8 +31,10 @@ export class WorkspaceManager {
     const sandbox = await this.provider.create({
       template: 'node',
       envAllowlist: [],
+      // Default-deny egress: the allowlist is passed at create time so a real provider can
+      // bring the sandbox up with the network already restricted, not opened-then-closed.
+      egressAllowlist: this.egressAllowlist,
     })
-    // Default-deny egress; only the configured domains are reachable (mission section 6.2).
     await this.provider.setEgressAllowlist(sandbox.id, this.egressAllowlist)
     for (const [path, contents] of Object.entries(STARTER_FILES)) {
       await this.provider.writeFile(sandbox.id, path, contents)

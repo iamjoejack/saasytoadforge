@@ -584,15 +584,19 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
       observation = `error: ${err instanceof Error ? err.message : String(err)}`
     }
 
-    // Track real edits so verification only gates finish when the workspace actually changed.
-    if (
-      (call.tool === 'write_file' || call.tool === 'edit_file' || call.tool === 'delete_file') &&
+    // Track real edits so verification gates finish when the workspace actually changed. A
+    // shell command (run) can mutate the workspace too (installers, scaffolders, sed, git), so
+    // it also arms verification; otherwise an all-shell task would skip the verify gate.
+    const isEditTool =
+      call.tool === 'write_file' || call.tool === 'edit_file' || call.tool === 'delete_file'
+    const editApplied =
+      isEditTool &&
       !observation.startsWith('error') &&
       !observation.startsWith('write rejected') &&
       !observation.startsWith('edit rejected') &&
       !observation.startsWith('delete rejected') &&
       !observation.startsWith('no change')
-    ) {
+    if (editApplied || call.tool === 'run') {
       madeEdits = true
     }
 
@@ -785,6 +789,13 @@ async function runTool(
     case 'run': {
       const cmd = str(call.args.cmd)
       if (!cmd) return 'error: run needs a cmd'
+      // When write approval is on, a shell command can do anything a write can, so gate it too.
+      if (requireWriteApproval) {
+        const id = `run:${ctx.stepId}`
+        emit({ type: 'approval', id, action: 'Run command', detail: cmd })
+        const approved = await approvals.request(id)
+        if (!approved) return 'run rejected by the user'
+      }
       const result = await tools.terminal.exec(cmd)
       emit({
         type: 'terminal',
