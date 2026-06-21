@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { mintAgentToken, DEFAULT_AGENT_SERVICE_SECRET } from '@forge/shared'
+import { mintAgentToken } from '@forge/shared'
 import { currentUser } from '@/lib/auth/server'
+import { requireAgentSecret } from '@/lib/agent-secret'
 
 export async function POST(req: Request) {
   const user = await currentUser()
@@ -19,7 +20,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'planId is required' }, { status: 400 })
   }
 
-  const secret = process.env.AGENT_SERVICE_SECRET ?? DEFAULT_AGENT_SERVICE_SECRET
+  let secret: string
+  try {
+    secret = requireAgentSecret()
+  } catch {
+    return NextResponse.json(
+      { error: 'server misconfigured: AGENT_SERVICE_SECRET' },
+      { status: 500 },
+    )
+  }
   const token = mintAgentToken(user.id, secret)
 
   const agentServiceUrl = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL ?? 'http://localhost:8787'

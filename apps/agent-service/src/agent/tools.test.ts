@@ -1,6 +1,22 @@
 import { describe, it, expect } from 'vitest'
 import { MockSandboxProvider } from '../sandbox'
 import { createToolSet, MockBrowserTool, svgPreviewDataUrl } from './tools'
+import { assertSafePath } from '../lib/paths'
+
+describe('assertSafePath', () => {
+  it('rejects absolute paths instead of silently rewriting them', () => {
+    expect(() => assertSafePath('/etc/passwd')).toThrow(/unsafe path/)
+    expect(() => assertSafePath('//etc/passwd')).toThrow(/unsafe path/)
+    expect(() => assertSafePath('\\windows\\system32')).toThrow(/unsafe path/)
+    expect(() => assertSafePath('C:\\secrets')).toThrow(/unsafe path/)
+  })
+
+  it('rejects parent traversal but allows normal relative paths', () => {
+    expect(() => assertSafePath('a/../b')).toThrow(/unsafe path/)
+    expect(assertSafePath('src/index.ts')).toBe('src/index.ts')
+    expect(assertSafePath('./a/b.txt')).toBe('a/b.txt')
+  })
+})
 
 describe('svgPreviewDataUrl', () => {
   it('encodes an svg data url that reflects the page heading', () => {

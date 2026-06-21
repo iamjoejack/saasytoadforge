@@ -31,6 +31,11 @@ export interface CreateSandboxOptions {
   template: string
   /** Environment variable names allowed to be injected into the sandbox. */
   envAllowlist: string[]
+  /**
+   * Domains the sandbox is allowed to reach. An empty list means default-deny: the sandbox
+   * gets no outbound network. Real providers must honor this at create time, not after.
+   */
+  egressAllowlist?: string[]
 }
 
 export interface ExecOptions {

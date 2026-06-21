@@ -236,6 +236,25 @@ describe('runAgentic', () => {
     expect(events.some((e) => e.type === 'message' && /repeated action/i.test(e.text))).toBe(true)
   })
 
+  it('stops an oscillating loop (A, B, A, B, A)', async () => {
+    const { events, result } = await setup(
+      [
+        '{"tool":"run","args":{"cmd":"a"}}',
+        '{"tool":"run","args":{"cmd":"b"}}',
+        '{"tool":"run","args":{"cmd":"a"}}',
+        '{"tool":"run","args":{"cmd":"b"}}',
+        '{"tool":"run","args":{"cmd":"a"}}', // third "a" within the window -> blocked
+        '{"tool":"finish","args":{"summary":"giving up"}}',
+      ],
+      'oscillate between two failing commands',
+    )
+
+    expect(result.ok).toBe(true)
+    // a, b, a, b executed (4); the third "a" is blocked.
+    expect(events.filter((e) => e.type === 'terminal').length).toBe(4)
+    expect(events.some((e) => e.type === 'message' && /repeated action/i.test(e.text))).toBe(true)
+  })
+
   it('verifies before finishing and re-prompts once when the build is not green', async () => {
     const provider = new MockSandboxProvider()
     const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
@@ -292,6 +311,63 @@ describe('runAgentic', () => {
     const result = await runAgentic(opts, (e) => events.push(e))
     expect(result.ok).toBe(true)
     expect(verifyCalls).toBe(0)
+  })
+
+  it('runs verification after a shell-only task, since run can mutate the workspace', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const events: AgentEvent[] = []
+    let verifyCalls = 0
+
+    const opts: AgenticOptions = {
+      task: 'install a dependency',
+      llm: new ScriptedLlm([
+        '{"tool":"run","args":{"cmd":"echo installing"}}',
+        '{"tool":"finish","args":{"summary":"done"}}',
+      ]),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals: new ApprovalGate(),
+      history: [],
+      verify: async () => {
+        verifyCalls += 1
+        return { ok: true, summary: 'green' }
+      },
+    }
+
+    const result = await runAgentic(opts, (e) => events.push(e))
+    expect(result.ok).toBe(true)
+    expect(verifyCalls).toBe(1) // run armed the verify gate even with no file-write tool
+  })
+
+  it('gates the run tool behind approval when write approval is on', async () => {
+    const provider = new MockSandboxProvider()
+    const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
+    const tools = createToolSet(provider, sandbox.id, new MockBrowserTool())
+    const approvals = new ApprovalGate()
+    const events: AgentEvent[] = []
+
+    const opts: AgenticOptions = {
+      task: 'run a command',
+      llm: new ScriptedLlm([
+        '{"tool":"run","args":{"cmd":"echo hi"}}',
+        '{"tool":"finish","args":{"summary":"stopped"}}',
+      ]),
+      model: 'claude-sonnet-4-5',
+      tools,
+      approvals,
+      requireWriteApproval: true,
+      history: [],
+    }
+
+    await runAgentic(opts, (e) => {
+      events.push(e)
+      if (e.type === 'approval') setTimeout(() => approvals.resolve(e.id, false), 0)
+    })
+
+    expect(events.some((e) => e.type === 'approval' && e.action === 'Run command')).toBe(true)
+    expect(events.some((e) => e.type === 'terminal')).toBe(false) // rejected, never executed
   })
 
   it('finishes after one block even if checks still fail, and says so honestly', async () => {

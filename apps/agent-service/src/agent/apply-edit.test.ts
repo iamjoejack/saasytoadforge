@@ -57,6 +57,20 @@ describe('applyEdit', () => {
     expect(res.ok).toBe(false)
     expect(!res.ok && res.reason).toMatch(/more than once/)
   })
+
+  it('refuses a fuzzy (whitespace-insensitive) match that hits more than once', () => {
+    // Trailing spaces force the fuzzy path; the trimmed block matches two places.
+    const before = 'foo \nbar\nfoo \nbar\n'
+    const res = applyEdit(before, { search: 'foo\nbar', replace: 'X\nY' })
+    expect(res.ok).toBe(false)
+    expect(!res.ok && res.reason).toMatch(/more than once/)
+  })
+
+  it('preserves an intentional trailing blank line in the replacement on the fuzzy path', () => {
+    const before = 'a = 1   \nb = 2\nc = 3' // trailing spaces on line 1 force the fuzzy path
+    const res = applyEdit(before, { search: 'a = 1\nb = 2', replace: 'a = 10\nb = 20\n' })
+    expect(res.ok && res.contents).toBe('a = 10\nb = 20\n\nc = 3')
+  })
 })
 
 describe('applyEdits', () => {

@@ -16,7 +16,9 @@ const DEFAULT_SANDBOX_TIMEOUT_MS = 5 * 60_000
 
 /**
  * Real microVM sandbox via E2B (Firecracker). Untrusted/agent code runs here, never on the
- * host. Egress policy is enforced by E2B at the microVM/template firewall level.
+ * host. Egress is all-or-nothing on this SDK: the sandbox is created with no outbound network
+ * unless an egress allowlist is configured (see create). Per-domain filtering would require a
+ * custom E2B template; until that exists, setEgressAllowlist cannot enforce specific domains.
  */
 export class E2BSandboxProvider implements SandboxProvider {
   private readonly sandboxes = new Map<string, Sandbox>()
@@ -31,9 +33,15 @@ export class E2BSandboxProvider implements SandboxProvider {
 
   async create(opts: CreateSandboxOptions): Promise<ForgeSandbox> {
     const template = opts.template || DEFAULT_TEMPLATE
+    // Default-deny egress. The E2B SDK exposes only an all-or-nothing internet toggle, so the
+    // sandbox stays offline unless the operator declared an egress allowlist. An empty
+    // allowlist (the default) means no outbound network, which is the real containment against
+    // a sandboxed process exfiltrating data or reaching internal endpoints.
+    const allowInternetAccess = (opts.egressAllowlist?.length ?? 0) > 0
     const sbx = await Sandbox.create(template, {
       apiKey: this.apiKey,
       timeoutMs: DEFAULT_SANDBOX_TIMEOUT_MS,
+      allowInternetAccess,
     })
     this.sandboxes.set(sbx.sandboxId, sbx)
     return { id: sbx.sandboxId, template, createdAt: new Date().toISOString() }
@@ -72,7 +80,12 @@ export class E2BSandboxProvider implements SandboxProvider {
   }
 
   async deleteFile(id: string, path: string): Promise<void> {
-    await this.exec(id, `rm -rf "${assertSafePath(path)}"`)
+    // Use the filesystem API, never a shell string, so a path can never inject shell commands.
+    try {
+      await this.get(id).files.remove(assertSafePath(path))
+    } catch {
+      // Idempotent: removing a path that is already gone is not an error.
+    }
   }
 
   async listFiles(id: string, dir: string): Promise<FileEntry[]> {
@@ -127,8 +140,15 @@ export class E2BSandboxProvider implements SandboxProvider {
     }
   }
 
-  async setEgressAllowlist(_id: string, _domains: string[]): Promise<void> {
-    // E2B enforces network policy at the microVM/template firewall level, not per call.
+  async setEgressAllowlist(_id: string, domains: string[]): Promise<void> {
+    // Network access is set all-or-nothing at create() time from the egress allowlist; this
+    // SDK has no per-domain API, so per-domain filtering is NOT enforced here. Warn rather than
+    // silently dropping the request so the limitation is never invisible.
+    if (domains.length > 0) {
+      console.warn(
+        `[e2b] per-domain egress is not enforced by the SDK; the sandbox uses all-or-nothing internet based on the allowlist (${domains.length} domain(s) requested). Use a custom E2B template for per-domain filtering.`,
+      )
+    }
   }
 
   async checkpoint(id: string): Promise<string> {

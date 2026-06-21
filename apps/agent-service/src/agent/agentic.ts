@@ -40,6 +40,10 @@ const MAX_CONTEXT_CHARS = 48_000
 /** How many times one turn will re-prompt a model that emits a malformed tool call. */
 const MAX_REPARSE_ATTEMPTS = 2
 
+/** Stuck detection: trip when the same call appears STUCK_LIMIT times within STUCK_WINDOW calls. */
+const STUCK_WINDOW = 6
+const STUCK_LIMIT = 3
+
 export const AGENTIC_SYSTEM_PROMPT = `You are Ronald, the SaaSyToad Forge coding agent, working inside an isolated sandbox workspace.
 
 You can use tools to inspect and change the workspace, and to ask the user questions. To call a tool, reply with ONLY a single JSON object, nothing else:
@@ -233,7 +237,13 @@ export function compactMessages(
     used += m.content.length
   }
 
-  const omitted = messages.length - head.length - tail.length
+  let omitted = messages.length - head.length - tail.length
+  // If the middle was cut, the oldest kept message can be an observation whose tool-call was
+  // dropped; drop that single orphan so the kept tail starts coherently (on an action or head).
+  if (omitted > 0 && tail.length > 0 && tail[0]?.role === 'user') {
+    tail.shift()
+    omitted += 1
+  }
   if (omitted <= 0) return messages
 
   const note: LlmMessage = {
@@ -265,7 +275,13 @@ function parseEditBlocks(args: Record<string, unknown>): EditBlock[] {
 
 /** A stable signature for a tool call, used to detect a stuck, repeating loop. */
 function fingerprint(call: ToolCall): string {
-  return `${call.tool}:${JSON.stringify(call.args)}`
+  // Canonicalize args (sorted keys) so trivially-reordered but equivalent calls hash the same.
+  const args = call.args
+  const canon = Object.keys(args)
+    .sort()
+    .map((k) => `${k}=${JSON.stringify(args[k])}`)
+    .join('&')
+  return `${call.tool}:${canon}`
 }
 
 const SEARCH_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.cache'])
@@ -420,8 +436,7 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
   let ok = true
   let finalText = ''
   let usedTools = false
-  let prevFingerprint = ''
-  let repeatCount = 0
+  const recentSigs: string[] = []
   let madeEdits = false
   let blockedOnce = false
   let reparseAttempts = 0
@@ -536,17 +551,14 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
 
     usedTools = true
 
-    // Stuck detection: three identical tool calls in a row with no intervening progress
-    // means the agent is looping. Refuse to run it again and nudge it to change course
-    // (a warning alone gets ignored; not executing is what breaks the loop).
+    // Stuck detection: if the same call appears STUCK_LIMIT times within a short window, the
+    // agent is looping. This catches both three-in-a-row and oscillation (A,B,A,B,A). Refuse
+    // to run it again and nudge it to change course (a warning alone gets ignored).
     const sig = fingerprint(call)
-    if (sig === prevFingerprint) {
-      repeatCount += 1
-    } else {
-      repeatCount = 0
-      prevFingerprint = sig
-    }
-    if (repeatCount >= 2) {
+    recentSigs.push(sig)
+    if (recentSigs.length > STUCK_WINDOW) recentSigs.shift()
+    const repeats = recentSigs.filter((s) => s === sig).length
+    if (repeats >= STUCK_LIMIT) {
       emit({
         type: 'message',
         text: 'Stopping a repeated action that was not making progress.',
@@ -555,7 +567,7 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
       messages.push({
         role: 'user',
         content:
-          `Observation from ${call.tool}: you have repeated the exact same ${call.tool} call ${repeatCount + 1} times in a row with no change. ` +
+          `Observation from ${call.tool}: you have made the same ${call.tool} call ${repeats} times with no change. ` +
           'That is not making progress. Try a different approach, gather more context, or call finish if you are blocked.',
       })
       continue
@@ -584,15 +596,19 @@ export async function runAgentic(opts: AgenticOptions, emit: Emit): Promise<{ ok
       observation = `error: ${err instanceof Error ? err.message : String(err)}`
     }
 
-    // Track real edits so verification only gates finish when the workspace actually changed.
-    if (
-      (call.tool === 'write_file' || call.tool === 'edit_file' || call.tool === 'delete_file') &&
+    // Track real edits so verification gates finish when the workspace actually changed. A
+    // shell command (run) can mutate the workspace too (installers, scaffolders, sed, git), so
+    // it also arms verification; otherwise an all-shell task would skip the verify gate.
+    const isEditTool =
+      call.tool === 'write_file' || call.tool === 'edit_file' || call.tool === 'delete_file'
+    const editApplied =
+      isEditTool &&
       !observation.startsWith('error') &&
       !observation.startsWith('write rejected') &&
       !observation.startsWith('edit rejected') &&
       !observation.startsWith('delete rejected') &&
       !observation.startsWith('no change')
-    ) {
+    if (editApplied || call.tool === 'run') {
       madeEdits = true
     }
 
@@ -785,6 +801,13 @@ async function runTool(
     case 'run': {
       const cmd = str(call.args.cmd)
       if (!cmd) return 'error: run needs a cmd'
+      // When write approval is on, a shell command can do anything a write can, so gate it too.
+      if (requireWriteApproval) {
+        const id = `run:${ctx.stepId}`
+        emit({ type: 'approval', id, action: 'Run command', detail: cmd })
+        const approved = await approvals.request(id)
+        if (!approved) return 'run rejected by the user'
+      }
       const result = await tools.terminal.exec(cmd)
       emit({
         type: 'terminal',
