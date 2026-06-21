@@ -236,6 +236,25 @@ describe('runAgentic', () => {
     expect(events.some((e) => e.type === 'message' && /repeated action/i.test(e.text))).toBe(true)
   })
 
+  it('stops an oscillating loop (A, B, A, B, A)', async () => {
+    const { events, result } = await setup(
+      [
+        '{"tool":"run","args":{"cmd":"a"}}',
+        '{"tool":"run","args":{"cmd":"b"}}',
+        '{"tool":"run","args":{"cmd":"a"}}',
+        '{"tool":"run","args":{"cmd":"b"}}',
+        '{"tool":"run","args":{"cmd":"a"}}', // third "a" within the window -> blocked
+        '{"tool":"finish","args":{"summary":"giving up"}}',
+      ],
+      'oscillate between two failing commands',
+    )
+
+    expect(result.ok).toBe(true)
+    // a, b, a, b executed (4); the third "a" is blocked.
+    expect(events.filter((e) => e.type === 'terminal').length).toBe(4)
+    expect(events.some((e) => e.type === 'message' && /repeated action/i.test(e.text))).toBe(true)
+  })
+
   it('verifies before finishing and re-prompts once when the build is not green', async () => {
     const provider = new MockSandboxProvider()
     const sandbox = await provider.create({ template: 'node', envAllowlist: [] })
