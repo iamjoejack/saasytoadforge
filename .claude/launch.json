@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@forge/web", "dev"],
       "port": 3000
+    },
+    {
+      "name": "agent",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@forge/agent-service", "dev"],
+      "port": 8787
     }
   ]
 }

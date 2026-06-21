@@ -1,17 +1,48 @@
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&display=swap');
 @import 'tailwindcss';
 
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* Radius scale */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 :root {
-  /* Default theme: SaaSyToad Forge brand. Industrial steampunk, brass + copper on near-black. */
-  --background: #060608;
-  --foreground: #ededed;
-  --brass: #c8a24a;
-  --brass-glow: rgba(200, 162, 74, 0.15);
-  --copper: #b56a3a;
-  --copper-glow: rgba(181, 106, 58, 0.15);
-  --gunmetal: #2a2d31;
-  --card-border: rgba(255, 255, 255, 0.06);
-  --glass-bg: rgba(12, 12, 14, 0.65);
+  color-scheme: dark;
+
+  /* Default theme: SaaSyToad Forge brand. Industrial steampunk, brass + copper on near-black.
+     Aligned with the CRM's --sp-iron, --sp-brass, and --sp-copper OKLCH tokens. */
+  --background: oklch(0.13 0.016 220);
+  --foreground: oklch(0.95 0.022 84);
+  --brass: oklch(0.78 0.13 78);
+  --brass-glow: oklch(0.78 0.13 78 / 0.15);
+  --copper: oklch(0.66 0.13 48);
+  --copper-glow: oklch(0.66 0.13 48 / 0.15);
+  --gunmetal: oklch(0.225 0.018 218);
+  --card-border: oklch(0.42 0.05 76 / 0.55);
+  --glass-bg: oklch(0.2 0.018 219 / 0.65);
+
+  /* Brand verdigris/patina from CRM */
+  --toad-green: oklch(0.72 0.12 150);
+  --toad-green-hover: oklch(0.78 0.12 150);
+  --toad-ink: oklch(0.95 0.022 84);
+  --toad-accent: oklch(0.78 0.13 78);
+
+  --shadow-xs: 0 1px 2px 0 oklch(0 0 0 / 0.5);
+  --shadow-sm: 0 1px 3px 0 oklch(0 0 0 / 0.6), 0 1px 2px -1px oklch(0 0 0 / 0.5);
+  --shadow-md: 0 6px 16px -4px oklch(0 0 0 / 0.6), 0 2px 6px -2px oklch(0 0 0 / 0.5);
+  --shadow-lg: 0 18px 40px -8px oklch(0 0 0 / 0.7), 0 6px 14px -6px oklch(0 0 0 / 0.55);
 }
 
 .theme-slate {
@@ -27,17 +58,21 @@
   --glass-bg: rgba(15, 15, 17, 0.7);
 }
 
+.theme-slate .theme-steampunk-backdrop {
+  display: none !important;
+}
+
 .theme-steampunk {
-  /* SaaSyToad Forge brand (same palette as :root); kept so the rivet + Cinzel rules apply. */
-  --background: #060608;
-  --foreground: #ededed;
-  --brass: #c8a24a;
-  --brass-glow: rgba(200, 162, 74, 0.15);
-  --copper: #b56a3a;
-  --copper-glow: rgba(181, 106, 58, 0.15);
-  --gunmetal: #2a2d31;
-  --card-border: rgba(255, 255, 255, 0.06);
-  --glass-bg: rgba(12, 12, 14, 0.65);
+  /* SaaSyToad Forge brand; kept aligned with :root. */
+  --background: oklch(0.13 0.016 220);
+  --foreground: oklch(0.95 0.022 84);
+  --brass: oklch(0.78 0.13 78);
+  --brass-glow: oklch(0.78 0.13 78 / 0.15);
+  --copper: oklch(0.66 0.13 48);
+  --copper-glow: oklch(0.66 0.13 48 / 0.15);
+  --gunmetal: oklch(0.225 0.018 218);
+  --card-border: oklch(0.42 0.05 76 / 0.55);
+  --glass-bg: oklch(0.2 0.018 219 / 0.65);
 }
 
 html,
@@ -47,7 +82,7 @@ body {
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   background-image: 
     radial-gradient(at 0% 0%, var(--copper-glow) 0px, transparent 50%),
@@ -73,7 +108,7 @@ body {
 }
 
 /* Background blueprint drafting grid */
-.circuit-grid {
+@utility circuit-grid {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -88,7 +123,7 @@ body {
 
 /* Steampunk Cinzel Serif Font Heading */
 .font-cinzel {
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   letter-spacing: normal;
 }
 .theme-steampunk .font-cinzel {
@@ -207,7 +242,7 @@ body {
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .glass-panel-hover:hover {
-  border-color: rgba(200, 162, 74, 0.25);
+  border-color: var(--brass);
   background: rgba(18, 18, 22, 0.85);
   box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6);
   transform: translateY(-2px);
@@ -221,4 +256,46 @@ body {
 
 .glow-pro {
   animation: glowPulse 4s infinite ease-in-out;
+}
+
+/* Steam decorative animations from CRM layout */
+@keyframes sp-steam-drift {
+  0% { transform: translate3d(0, 0, 0) scale(0.9); opacity: 0; }
+  18% { opacity: var(--steam-opacity, 0.5); }
+  82% { opacity: var(--steam-opacity, 0.5); }
+  100% {
+    transform: translate3d(var(--steam-dx, 6%), var(--steam-dy, -18%), 0) scale(1.4);
+    opacity: 0;
+  }
+}
+
+.sp-steam {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(30px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    oklch(0.92 0.03 80 / 0.55),
+    oklch(0.8 0.04 80 / 0.18) 45%,
+    transparent 70%
+  );
+  animation: sp-steam-drift var(--steam-dur, 22s) ease-in-out infinite;
+  animation-delay: var(--steam-delay, 0s);
+  will-change: transform, opacity;
+}
+
+/* Brushed-metal grain overlay from CRM */
+@utility metal-grain {
+  position: relative;
+}
+.metal-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("/textures/brushed-metal.svg");
+  background-size: 220px 220px;
+  mix-blend-mode: overlay;
 }
