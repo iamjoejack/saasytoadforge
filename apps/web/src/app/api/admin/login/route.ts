@@ -19,7 +19,9 @@ export async function POST(req: Request) {
   try {
     result = await getAdminStore().login(email, password, { setupSecret })
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Login failed.' }, { status: 500 })
+    // Log the real error server-side; never echo provider internals to an unauthenticated caller.
+    console.error('admin login error:', err)
+    return NextResponse.json({ error: 'Login failed.' }, { status: 500 })
   }
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 401 })
 
