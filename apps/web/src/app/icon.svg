@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="SaaSyToad">
+  <!-- PLACEHOLDER logo mark. Replace with final SaaSyToad toad art when ready.
+       This is the single source for the in-app logo, rendered via <Logo/>.
+       Tracked in REBRAND_CHANGELOG.md (Phase 3). -->
+  <rect width="256" height="256" rx="56" fill="#2E9E5B"/>
+  <!-- head -->
+  <ellipse cx="128" cy="156" rx="84" ry="66" fill="#36B069"/>
+  <!-- eye mounds -->
+  <circle cx="90" cy="86" r="34" fill="#36B069"/>
+  <circle cx="166" cy="86" r="34" fill="#36B069"/>
+  <!-- eyes -->
+  <circle cx="90" cy="82" r="18" fill="#ffffff"/>
+  <circle cx="166" cy="82" r="18" fill="#ffffff"/>
+  <circle cx="95" cy="84" r="8" fill="#11331E"/>
+  <circle cx="171" cy="84" r="8" fill="#11331E"/>
+  <!-- cheeky smile -->
+  <path d="M82 160 q46 40 92 0" fill="none" stroke="#11331E" stroke-width="10" stroke-linecap="round"/>
+</svg>
