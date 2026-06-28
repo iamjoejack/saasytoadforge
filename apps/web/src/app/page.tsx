@@ -23,12 +23,6 @@ export default function Home() {
         >
           Open workspace
         </a>
-        <a
-          href="#"
-          className="rounded-md border border-zinc-700 px-5 py-2.5 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
-        >
-          Read the docs
-        </a>
       </div>
     </main>
   )
