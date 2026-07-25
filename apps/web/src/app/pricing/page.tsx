@@ -78,7 +78,7 @@ export default function PricingPage() {
               >
                 {isPro && (
                   <span className="absolute top-3 right-3 rounded-full bg-[var(--brass)]/15 border border-[var(--brass)]/30 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--brass)]">
-                    Most Popular
+                    Most popular
                   </span>
                 )}
                 <div className="text-sm font-medium text-zinc-400">{plan.name}</div>

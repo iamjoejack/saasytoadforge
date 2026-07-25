@@ -79,9 +79,9 @@ function SignInForm() {
         {isOwner && (
           <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-[var(--brass)]/30 bg-[var(--brass)]/8 px-3.5 py-3">
             <div>
-              <p className="text-[12px] font-bold text-[var(--brass)] leading-snug">Company Owner Account</p>
+              <p className="text-[12px] font-bold text-[var(--brass)] leading-snug">Owner account</p>
               <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-                This account has <strong className="text-white">unlimited</strong> agent access — no token or spending limits.
+                This account has <strong className="text-white">unlimited</strong> agent access with no token or spending limits.
               </p>
             </div>
           </div>
