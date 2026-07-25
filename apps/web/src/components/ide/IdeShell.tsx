@@ -31,6 +31,8 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
   const setTheme = useIde((s) => s.setTheme)
   const viewMode = useIde((s) => s.viewMode)
   const setViewMode = useIde((s) => s.setViewMode)
+  const terminal = useIde((s) => s.terminal)
+  const reloadPreview = useIde((s) => s.reloadPreview)
 
   const [showAbout, setShowAbout] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -79,11 +81,16 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
     }
   }
 
+  // Terminal-backed actions. They are disabled until the shell registers a handle, so the
+  // menu can never claim work it did not do.
   function handleRunTests() {
     setActiveMenu(null)
-    alert(
-      'Initiating workspace unit test suite. Test results will stream in the background console.',
-    )
+    terminal?.runCommand('npm test')
+  }
+
+  function handleClearConsole() {
+    setActiveMenu(null)
+    terminal?.clear()
   }
 
   const menus = [
@@ -169,19 +176,21 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
       name: 'Run',
       items: [
         { label: 'Review and deploy', action: () => handleDeploy() },
-        { label: 'Run unit tests', action: handleRunTests },
+        { label: 'Run unit tests', action: handleRunTests, disabled: !terminal },
         {
           label: 'Reload preview',
           action: () => {
-            setViewMode('browser')
-            window.location.reload()
+            setActiveMenu(null)
+            // Reload the preview only. A window reload would drop open tabs, unsaved
+            // buffers, and the agent socket.
+            reloadPreview()
           },
         },
       ],
     },
     {
       name: 'Terminal',
-      items: [{ label: 'Clear console', action: () => alert('Terminal console reset complete.') }],
+      items: [{ label: 'Clear console', action: handleClearConsole, disabled: !terminal }],
     },
     {
       name: 'Help',
@@ -381,7 +390,6 @@ function IdeStatusBar({ workspaceId }: { workspaceId: string }) {
   const connected = useAgent((s) => s.connected)
   const running = useAgent((s) => s.running)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
-  const [notifCount] = useState(0)
 
   // Track when dirty flips from true to false → file was saved
   const isDirty = activePath ? (dirty[activePath] ?? false) : false
@@ -462,15 +470,11 @@ function IdeStatusBar({ workspaceId }: { workspaceId: string }) {
       <div className="h-full w-px bg-white/5 mx-0.5" />
       <span className="px-2">LF</span>
 
-      {/* Language */}
+      {/* Language, detected from the active file. Read-only: there is no language picker. */}
       <div className="h-full w-px bg-white/5 mx-0.5" />
-      <button
-        type="button"
-        className="px-2 h-full hover:bg-white/5 transition cursor-pointer text-zinc-400"
-        title="Select language mode"
-      >
+      <span className="px-2 h-full flex items-center text-zinc-400" title="Detected language">
         {langLabel}
-      </button>
+      </span>
 
       {/* Settings */}
       <div className="h-full w-px bg-white/5 mx-0.5" />
@@ -495,24 +499,6 @@ function IdeStatusBar({ workspaceId }: { workspaceId: string }) {
         </svg>
         Forge · Settings
       </Link>
-
-      {/* Notifications */}
-      <div className="h-full w-px bg-white/5 mx-0.5" />
-      <button
-        type="button"
-        className="px-2 h-full flex items-center gap-1 hover:bg-white/5 transition cursor-pointer text-zinc-500 hover:text-zinc-300"
-        title="Notifications"
-      >
-        <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          />
-        </svg>
-        {notifCount > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]" />}
-      </button>
     </div>
   )
 }

@@ -15,8 +15,8 @@ interface ExtensionItem {
   category: string
   description: string
   secretKey: string // mapped key in config.secrets
-  icon: string
-  command: string
+  /** Server env vars the operator sets to turn this on. */
+  envVars: string
   docUrl: string
 }
 
@@ -28,8 +28,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     description:
       'PostgreSQL database, user authentication, row-level security, and real-time backend structures.',
     secretKey: 'supabase',
-    icon: '',
-    command: 'stripe projects add supabase',
+    envVars: 'SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY',
     docUrl: 'https://supabase.com/docs',
   },
   {
@@ -39,8 +38,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     description:
       'Secure, sandboxed browser and terminal execution microVM environments for AI agents.',
     secretKey: 'e2b',
-    icon: '',
-    command: 'stripe projects add e2b',
+    envVars: 'E2B_API_KEY',
     docUrl: 'https://e2b.dev/docs',
   },
   {
@@ -49,8 +47,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     category: 'Billing & Subscriptions',
     description: 'Accept customer payments, manage subscriptions, and verify checkout webhooks.',
     secretKey: 'stripe',
-    icon: '',
-    command: 'stripe projects add stripe',
+    envVars: 'STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET',
     docUrl: 'https://docs.stripe.com',
   },
   {
@@ -60,8 +57,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     description:
       'Low-latency serverless Redis database for state storage, caching, and worker message queues.',
     secretKey: 'upstashRedis',
-    icon: '',
-    command: 'stripe projects add upstash-redis',
+    envVars: 'UPSTASH_REDIS_REST_URL',
     docUrl: 'https://upstash.com/docs',
   },
   {
@@ -71,8 +67,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     description:
       'Modern developer-friendly email API for sending notifications and transactional verification logs.',
     secretKey: 'resend',
-    icon: '✉',
-    command: 'stripe projects add resend',
+    envVars: 'RESEND_API_KEY',
     docUrl: 'https://resend.com/docs',
   },
   {
@@ -82,8 +77,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     description:
       'Deploy frontend apps and backend serverless endpoints instantly on the global edge CDN.',
     secretKey: 'vercel',
-    icon: '▲',
-    command: 'stripe projects add vercel',
+    envVars: 'VERCEL_TOKEN',
     docUrl: 'https://vercel.com/docs',
   },
   {
@@ -93,8 +87,7 @@ const EXTENSIONS_CATALOG: ExtensionItem[] = [
     description:
       'Connect database, queues, and sandbox app triggers directly to over 8,000+ API apps via webhook workflows.',
     secretKey: 'zapier',
-    icon: '',
-    command: 'stripe projects add zapier',
+    envVars: 'ZAPIER_API_KEY',
     docUrl: 'https://zapier.com/developer',
   },
 ]
@@ -399,8 +392,8 @@ export default function DashboardPage() {
                     Forge Extension Store
                   </h2>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    Connect API services and platform tools. Link them using the Stripe Projects CLI
-                    tool below.
+                    Services the agent can wire into a build. Each one turns on when its keys are
+                    set on the agent service, so connecting is an operator step, not a click here.
                   </p>
                 </div>
 
@@ -417,10 +410,7 @@ export default function DashboardPage() {
                         className="flex flex-col rounded-xl border border-white/5 bg-white/[0.01] p-4 hover:border-white/10 transition justify-between"
                       >
                         <div>
-                          <div className="flex items-start justify-between mb-2">
-                            <span className="text-xl" role="img" aria-label={ext.name}>
-                              {ext.icon}
-                            </span>
+                          <div className="flex items-start justify-end mb-2">
                             <span
                               className={cn(
                                 'rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide border',
@@ -429,7 +419,7 @@ export default function DashboardPage() {
                                   : 'bg-zinc-800/40 border-zinc-700 text-zinc-500',
                               )}
                             >
-                              {isConnected ? 'Connected' : 'Available'}
+                              {isConnected ? 'Connected' : 'Not connected'}
                             </span>
                           </div>
 
@@ -443,16 +433,22 @@ export default function DashboardPage() {
                         </div>
 
                         <div className="mt-4 pt-3 border-t border-white/5 space-y-2">
+                          <span className="block text-[9px] uppercase tracking-wider font-bold text-zinc-600">
+                            Set on the agent service
+                          </span>
                           <div className="flex items-center justify-between gap-1 bg-black/40 rounded p-1.5 border border-white/5">
-                            <code className="text-[10px] text-zinc-400 font-mono truncate select-all">
-                              {ext.command}
+                            <code
+                              className="text-[10px] text-zinc-400 font-mono truncate select-all"
+                              title={ext.envVars}
+                            >
+                              {ext.envVars}
                             </code>
                             <button
                               type="button"
-                              onClick={() => handleCopy(ext.command, ext.id)}
+                              onClick={() => handleCopy(ext.envVars, ext.id)}
                               className="text-[9px] text-[var(--brass)] hover:underline shrink-0 font-bold px-1.5 cursor-pointer"
                             >
-                              {isCopied ? 'Copied!' : 'Copy'}
+                              {isCopied ? 'Copied' : 'Copy'}
                             </button>
                           </div>
                           <a

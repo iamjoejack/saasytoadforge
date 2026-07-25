@@ -18,6 +18,16 @@ export interface CodeEditor {
   setPosition(position: { lineNumber: number; column: number }): void
 }
 
+/**
+ * The bits of the live xterm session the IDE chrome drives. Registered by TerminalPane so
+ * menu actions run against the real shell instead of reporting success they never performed.
+ */
+export interface TerminalHandle {
+  clear(): void
+  /** Types the command into the sandbox shell and presses enter. */
+  runCommand(command: string): void
+}
+
 interface IdeStore {
   workspaceId: string | null
   activePath: string | null
@@ -26,8 +36,11 @@ interface IdeStore {
   dirty: Record<string, boolean>
   saving: Record<string, boolean>
   editorInstance: CodeEditor | null
+  terminal: TerminalHandle | null
   theme: 'slate' | 'steampunk'
   viewMode: 'editor' | 'browser'
+  /** Bumped to ask the live preview to reload without reloading the whole IDE. */
+  previewReloadNonce: number
 
   setWorkspace: (id: string) => void
   openFile: (path: string) => Promise<void>
@@ -36,6 +49,8 @@ interface IdeStore {
   edit: (path: string, value: string) => void
   save: (path: string) => Promise<void>
   setEditorInstance: (editor: CodeEditor | null) => void
+  setTerminal: (terminal: TerminalHandle | null) => void
+  reloadPreview: () => void
   insertSnippet: (snippet: string) => void
   setTheme: (theme: 'slate' | 'steampunk') => void
   setViewMode: (mode: 'editor' | 'browser') => void
@@ -60,8 +75,10 @@ export const useIde = create<IdeStore>()((set, get) => ({
   dirty: {},
   saving: {},
   editorInstance: null,
+  terminal: null,
   theme: 'steampunk',
   viewMode: 'editor',
+  previewReloadNonce: 0,
   cursorPos: { line: 1, col: 1 },
   activeLanguage: 'plaintext',
 
@@ -118,6 +135,11 @@ export const useIde = create<IdeStore>()((set, get) => ({
   },
 
   setEditorInstance: (editor) => set({ editorInstance: editor }),
+
+  setTerminal: (terminal) => set({ terminal }),
+
+  reloadPreview: () =>
+    set((s) => ({ viewMode: 'browser', previewReloadNonce: s.previewReloadNonce + 1 })),
 
   insertSnippet: (snippet) => {
     const editor = get().editorInstance

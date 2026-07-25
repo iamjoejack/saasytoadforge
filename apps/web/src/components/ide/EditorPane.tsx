@@ -55,6 +55,7 @@ export function EditorPane() {
   const [browserUrl, setBrowserUrl] = useState('http://localhost:3000')
   const [inputUrl, setInputUrl] = useState('http://localhost:3000')
   const [iframeKey, setIframeKey] = useState(0)
+  const previewReloadNonce = useIde((s) => s.previewReloadNonce)
 
   // Inspect Mode State
   const [inspectMode, setInspectMode] = useState(false)
@@ -81,6 +82,12 @@ export function EditorPane() {
       setEditorInstance(null)
     }
   }, [setEditorInstance])
+
+  // Remounts the iframe when the Run menu asks for a preview reload. Skips the first render.
+  useEffect(() => {
+    if (previewReloadNonce === 0) return
+    setIframeKey((k) => k + 1)
+  }, [previewReloadNonce])
 
   // Click-to-Edit message listener from real iframe proxy
   useEffect(() => {
