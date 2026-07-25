@@ -35,9 +35,17 @@ export class WorkspaceManager {
       // bring the sandbox up with the network already restricted, not opened-then-closed.
       egressAllowlist: this.egressAllowlist,
     })
-    await this.provider.setEgressAllowlist(sandbox.id, this.egressAllowlist)
-    for (const [path, contents] of Object.entries(STARTER_FILES)) {
-      await this.provider.writeFile(sandbox.id, path, contents)
+    // From here the microVM is live and billing. If seeding fails we own an orphan: running,
+    // owned by nobody, absent from listAll(), so not even the owner console can see it. Tear
+    // it down before surfacing the error.
+    try {
+      await this.provider.setEgressAllowlist(sandbox.id, this.egressAllowlist)
+      for (const [path, contents] of Object.entries(STARTER_FILES)) {
+        await this.provider.writeFile(sandbox.id, path, contents)
+      }
+    } catch (err) {
+      await this.provider.destroy(sandbox.id).catch(() => {})
+      throw err
     }
     const workspace: Workspace = {
       id: sandbox.id,
