@@ -31,7 +31,12 @@ const ROLE_COLOR: Record<AgentRole, string> = {
 export function RoleBadge({ role }: { role?: AgentRole }) {
   if (!role) return null
   return (
-    <span className={cn('rounded border px-1.5 py-0.5 text-[10px] font-medium flex items-center gap-1', ROLE_COLOR[role])}>
+    <span
+      className={cn(
+        'rounded border px-1.5 py-0.5 text-[10px] font-medium flex items-center gap-1',
+        ROLE_COLOR[role],
+      )}
+    >
       {role}
     </span>
   )
@@ -72,7 +77,10 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
   return parts.map((part, pi) => {
     if (part.startsWith('`') && part.endsWith('`')) {
       return (
-        <code key={pi} className="font-mono text-[11px] bg-black/50 px-1 py-0.5 rounded text-emerald-400 border border-white/5">
+        <code
+          key={pi}
+          className="font-mono text-[11px] bg-black/50 px-1 py-0.5 rounded text-emerald-400 border border-white/5"
+        >
           {part.slice(1, -1)}
         </code>
       )
@@ -106,7 +114,7 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
 function renderMarkdown(text: string): React.ReactNode {
   const lines = text.split('\n')
   const finalElements: React.ReactNode[] = []
-  
+
   let inCodeBlock = false
   let codeBlockLines: string[] = []
   let codeBlockLang = ''
@@ -119,7 +127,7 @@ function renderMarkdown(text: string): React.ReactNode {
       finalElements.push(
         <p key={`p-${key}`} className="mb-2 last:mb-0 leading-relaxed text-[13px] text-zinc-200">
           {parseInlineMarkdown(content)}
-        </p>
+        </p>,
       )
       currentParagraphLines = []
     }
@@ -128,11 +136,14 @@ function renderMarkdown(text: string): React.ReactNode {
   const flushList = (key: string | number) => {
     if (currentListItems.length > 0) {
       finalElements.push(
-        <ul key={`list-${key}`} className="list-disc pl-5 mb-2.5 space-y-1 text-[13px] text-zinc-200">
+        <ul
+          key={`list-${key}`}
+          className="list-disc pl-5 mb-2.5 space-y-1 text-[13px] text-zinc-200"
+        >
           {currentListItems.map((item, idx) => (
             <li key={idx}>{parseInlineMarkdown(item)}</li>
           ))}
-        </ul>
+        </ul>,
       )
       currentListItems = []
     }
@@ -146,7 +157,10 @@ function renderMarkdown(text: string): React.ReactNode {
         const codeText = codeBlockLines.join('\n')
         const lang = codeBlockLang || 'code'
         finalElements.push(
-          <div key={`code-${i}`} className="my-2.5 rounded-lg border border-white/10 bg-black/60 overflow-hidden font-mono text-[11px]">
+          <div
+            key={`code-${i}`}
+            className="my-2.5 rounded-lg border border-white/10 bg-black/60 overflow-hidden font-mono text-[11px]"
+          >
             <div className="flex items-center justify-between bg-black/30 px-3 py-1.5 border-b border-white/5 text-[10px] text-zinc-500 font-sans">
               <span>{lang.toUpperCase()}</span>
               <CopyCodeBlockButton text={codeText} />
@@ -154,7 +168,7 @@ function renderMarkdown(text: string): React.ReactNode {
             <pre className="p-3 text-emerald-400 overflow-auto whitespace-pre leading-relaxed select-text">
               <code>{codeText}</code>
             </pre>
-          </div>
+          </div>,
         )
         codeBlockLines = []
         inCodeBlock = false
@@ -212,12 +226,22 @@ function CopyButton({ text }: { text: string }) {
       className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-zinc-600 hover:text-zinc-300 cursor-pointer"
     >
       {copied ? (
-        <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          className="h-3.5 w-3.5 text-emerald-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
       ) : (
         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
         </svg>
       )}
     </button>
@@ -229,9 +253,18 @@ export function ThinkingBubble() {
     <div className="flex justify-start">
       <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm bg-white/5 px-4 py-3">
         <div className="flex items-center gap-1">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]/70 animate-bounce" style={{ animationDelay: '0ms' }} />
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]/70 animate-bounce" style={{ animationDelay: '150ms' }} />
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]/70 animate-bounce" style={{ animationDelay: '300ms' }} />
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]/70 animate-bounce"
+            style={{ animationDelay: '0ms' }}
+          />
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]/70 animate-bounce"
+            style={{ animationDelay: '150ms' }}
+          />
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]/70 animate-bounce"
+            style={{ animationDelay: '300ms' }}
+          />
         </div>
         <span className="text-[11px] text-zinc-500 italic">thinking...</span>
       </div>
@@ -282,7 +315,10 @@ export function MessageBubble({
                 <div className="relative">
                   {renderMarkdown(text)}
                   {isStreaming && (
-                    <span className="inline-block w-1.5 h-3.5 bg-[var(--brass)] animate-pulse ml-0.5 align-middle" aria-hidden />
+                    <span
+                      className="inline-block w-1.5 h-3.5 bg-[var(--brass)] animate-pulse ml-0.5 align-middle"
+                      aria-hidden
+                    />
                   )}
                 </div>
               )}
@@ -291,7 +327,9 @@ export function MessageBubble({
           </div>
         </div>
         {ts && (
-          <span className={cn('text-[9px] text-zinc-650 px-1', isUser ? 'text-right' : 'text-left')}>
+          <span
+            className={cn('text-[9px] text-zinc-600 px-1', isUser ? 'text-right' : 'text-left')}
+          >
             {relativeTime(ts)}
           </span>
         )}
@@ -309,7 +347,9 @@ export function PlanView({ steps }: { steps: PlanStep[] }) {
   return (
     <div className="rounded-xl border border-white/10 bg-black/25 overflow-hidden">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Agent Plan</div>
+        <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+          Agent Plan
+        </div>
         <div className="flex items-center gap-2">
           <div className="h-1 w-20 rounded-full bg-zinc-800 overflow-hidden">
             <div
@@ -317,16 +357,23 @@ export function PlanView({ steps }: { steps: PlanStep[] }) {
               style={{ width: `${pct}%` }}
             />
           </div>
-          <span className="text-[10px] text-zinc-500 tabular-nums">{done}/{steps.length}</span>
+          <span className="text-[10px] text-zinc-500 tabular-nums">
+            {done}/{steps.length}
+          </span>
         </div>
       </div>
       <ol className="p-2.5 space-y-1">
         {steps.map((step) => (
-          <li key={step.id} className="flex items-center gap-2.5 text-[13px] rounded px-2 py-1 hover:bg-white/[0.02]">
+          <li
+            key={step.id}
+            className="flex items-center gap-2.5 text-[13px] rounded px-2 py-1 hover:bg-white/[0.02]"
+          >
             <span className={cn('w-4 shrink-0 text-center text-[13px]', STEP_COLOR[step.status])}>
               {STEP_ICON[step.status]}
             </span>
-            <span className={step.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-200'}>
+            <span
+              className={step.status === 'done' ? 'text-zinc-400 line-through' : 'text-zinc-200'}
+            >
               {step.title}
             </span>
             {step.role ? (
@@ -367,7 +414,10 @@ export function DiffView({
           <RoleBadge role={agent} />
         </span>
       </div>
-      <pre className="p-3 font-mono text-[11px] leading-relaxed overflow-auto" style={{ maxHeight: expanded ? '360px' : '140px' }}>
+      <pre
+        className="p-3 font-mono text-[11px] leading-relaxed overflow-auto"
+        style={{ maxHeight: expanded ? '360px' : '140px' }}
+      >
         {preview.map((line, i) => {
           const tag = line[0]
           const color =
@@ -377,7 +427,7 @@ export function DiffView({
                 ? 'text-red-400'
                 : line.startsWith('diff ') || line.startsWith('---') || line.startsWith('+++')
                   ? 'text-zinc-600'
-                  : 'text-zinc-450'
+                  : 'text-zinc-400'
           return (
             <div key={i} className={color}>
               {line || ' '}
@@ -447,19 +497,29 @@ export function TerminalView({ result, agent }: { result: TerminalResult; agent?
         <span
           className={cn(
             'ml-auto shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-bold',
-            passed ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/15 text-red-400 border border-red-500/20',
+            passed
+              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+              : 'bg-red-500/15 text-red-400 border border-red-500/20',
           )}
         >
           exit {result.exitCode}
         </span>
       </div>
       {output && (
-        <pre className="px-3 pt-2 pb-1 font-mono text-[11px] leading-relaxed text-zinc-350 overflow-auto whitespace-pre-wrap" style={{ maxHeight: '180px' }}>
+        <pre
+          className="px-3 pt-2 pb-1 font-mono text-[11px] leading-relaxed text-zinc-350 overflow-auto whitespace-pre-wrap"
+          style={{ maxHeight: '180px' }}
+        >
           {!expanded && lines.length > 12 && (
             <div className="text-zinc-600 italic mb-1">…{lines.length - 12} lines hidden</div>
           )}
           {previewLines.map((line, i) => (
-            <div key={i} className={result.stderr && !passed && i === previewLines.length - 1 ? 'text-red-400' : ''}>
+            <div
+              key={i}
+              className={
+                result.stderr && !passed && i === previewLines.length - 1 ? 'text-red-400' : ''
+              }
+            >
               {line}
             </div>
           ))}
@@ -516,14 +576,16 @@ export function ApprovalCard({
   onReject: () => void
 }) {
   return (
-    <div className={cn(
-      'rounded-xl border p-4 space-y-3 animate-fade-in',
-      status === 'pending'
-        ? 'border-[var(--brass)]/40 bg-[var(--brass)]/8'
-        : status === 'approved'
-          ? 'border-emerald-500/25 bg-emerald-500/5'
-          : 'border-zinc-700/40 bg-white/[0.02]'
-    )}>
+    <div
+      className={cn(
+        'rounded-xl border p-4 space-y-3 animate-fade-in',
+        status === 'pending'
+          ? 'border-[var(--brass)]/40 bg-[var(--brass)]/8'
+          : status === 'approved'
+            ? 'border-emerald-500/25 bg-emerald-500/5'
+            : 'border-zinc-700/40 bg-white/[0.02]',
+      )}
+    >
       <div className="flex items-start gap-2.5">
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-zinc-100">{action}</div>
@@ -575,14 +637,16 @@ export function SpendApprovalCard({
   onReject: () => void
 }) {
   return (
-    <div className={cn(
-      'rounded-xl border p-4 space-y-3 animate-fade-in',
-      status === 'pending'
-        ? 'border-amber-500/40 bg-amber-500/8'
-        : status === 'approved'
-          ? 'border-emerald-500/25 bg-emerald-500/5'
-          : 'border-zinc-700/40 bg-white/[0.02]'
-    )}>
+    <div
+      className={cn(
+        'rounded-xl border p-4 space-y-3 animate-fade-in',
+        status === 'pending'
+          ? 'border-amber-500/40 bg-amber-500/8'
+          : status === 'approved'
+            ? 'border-emerald-500/25 bg-emerald-500/5'
+            : 'border-zinc-700/40 bg-white/[0.02]',
+      )}
+    >
       <div className="flex items-start gap-2.5">
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-zinc-100">Credit Extension Required</div>
@@ -611,7 +675,12 @@ export function SpendApprovalCard({
           </button>
         </div>
       ) : (
-        <div className={cn('text-xs font-semibold', status === 'approved' ? 'text-emerald-400' : 'text-zinc-600')}>
+        <div
+          className={cn(
+            'text-xs font-semibold',
+            status === 'approved' ? 'text-emerald-400' : 'text-zinc-600',
+          )}
+        >
           {status === 'approved' ? `✓ +$${blockUsd.toFixed(2)} credits added` : '✕ Run cancelled'}
         </div>
       )}
@@ -639,7 +708,7 @@ export function QuestionCard({
   function toggle(option: string) {
     if (isMultiSelect) {
       setSelected((curr) =>
-        curr.includes(option) ? curr.filter((o) => o !== option) : [...curr, option]
+        curr.includes(option) ? curr.filter((o) => o !== option) : [...curr, option],
       )
     } else {
       setSelected([option])
@@ -672,7 +741,7 @@ export function QuestionCard({
                   'w-full text-left rounded-lg border px-3 py-2.5 text-xs transition flex items-center justify-between cursor-pointer',
                   isChecked
                     ? 'border-[var(--brass)] bg-[var(--brass)]/15 text-[var(--brass)] font-semibold'
-                    : 'border-white/8 bg-black/25 text-zinc-300 hover:bg-black/40 hover:border-white/15'
+                    : 'border-white/8 bg-black/25 text-zinc-300 hover:bg-black/40 hover:border-white/15',
                 )}
               >
                 <span>{option}</span>
@@ -700,7 +769,7 @@ export function QuestionCard({
                   'rounded-lg border px-3 py-2 text-xs opacity-70 flex items-center justify-between',
                   wasSelected
                     ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-400 font-semibold'
-                    : 'border-white/5 bg-black/15 text-zinc-550'
+                    : 'border-white/5 bg-black/15 text-zinc-500',
                 )}
               >
                 <span>{option}</span>

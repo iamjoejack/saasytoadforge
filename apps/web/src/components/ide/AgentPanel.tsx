@@ -24,7 +24,10 @@ function SpendMeter() {
   const [cap, setCap] = useState<number | null>(null)
 
   useEffect(() => {
-    client.getConfig().then((c) => setCap(c.caps.perUserUsd)).catch(() => {})
+    client
+      .getConfig()
+      .then((c) => setCap(c.caps.perUserUsd))
+      .catch(() => {})
   }, [])
 
   if (spendUsd === null || cap === null) return null
@@ -36,12 +39,14 @@ function SpendMeter() {
   return (
     <div className="px-3 py-1.5 border-b border-white/5 bg-black/20 select-none">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-600">Credits used</span>
+        <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-600">
+          Credits used
+        </span>
         <span className={cn('text-[10px] font-bold tabular-nums', textColor)}>
           ${spendUsd.toFixed(4)} / ${cap.toFixed(2)}
         </span>
       </div>
-      <div className="h-1 w-full rounded-full bg-zinc-850 overflow-hidden">
+      <div className="h-1 w-full rounded-full bg-zinc-800 overflow-hidden">
         <div
           className={cn('h-full rounded-full transition-all duration-700', color)}
           style={{ width: `${pct}%` }}
@@ -57,7 +62,8 @@ function SessionHistory({ workspaceId, onClose }: { workspaceId: string; onClose
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    client.getSessions(workspaceId)
+    client
+      .getSessions(workspaceId)
       .then(setSessions)
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -66,7 +72,9 @@ function SessionHistory({ workspaceId, onClose }: { workspaceId: string; onClose
   return (
     <div className="flex flex-col h-full bg-[#0c0c0e]">
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Session History</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+          Session History
+        </span>
         <button
           type="button"
           onClick={onClose}
@@ -81,17 +89,25 @@ function SessionHistory({ workspaceId, onClose }: { workspaceId: string; onClose
         ) : sessions.length === 0 ? (
           <p className="text-[11px] text-zinc-600 px-2 py-3 text-center">No sessions yet.</p>
         ) : (
-          sessions.slice().reverse().map((s) => (
-            <div
-              key={s.id}
-              className="rounded-lg border border-white/5 bg-black/20 px-3 py-2 hover:border-white/10 hover:bg-black/30 transition cursor-default"
-            >
-              <p className="text-[12px] text-zinc-300 line-clamp-2 leading-snug">{s.task}</p>
-              <p className="mt-1 text-[10px] text-zinc-600">
-                {new Date(s.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
-          ))
+          sessions
+            .slice()
+            .reverse()
+            .map((s) => (
+              <div
+                key={s.id}
+                className="rounded-lg border border-white/5 bg-black/20 px-3 py-2 hover:border-white/10 hover:bg-black/30 transition cursor-default"
+              >
+                <p className="text-[12px] text-zinc-300 line-clamp-2 leading-snug">{s.task}</p>
+                <p className="mt-1 text-[10px] text-zinc-600">
+                  {new Date(s.createdAt).toLocaleString([], {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+            ))
         )}
       </div>
     </div>
@@ -102,19 +118,27 @@ function SessionHistory({ workspaceId, onClose }: { workspaceId: string; onClose
 function ZapierPanel({ workspaceId }: { workspaceId: string }) {
   const [webhookUrl, setWebhookUrl] = useState('')
   const [triggerEvent, setTriggerEvent] = useState('user.registered')
-  const [triggerStatus, setTriggerStatus] = useState<'idle' | 'sending' | 'success' | 'failed'>('idle')
+  const [triggerStatus, setTriggerStatus] = useState<'idle' | 'sending' | 'success' | 'failed'>(
+    'idle',
+  )
   const [triggerLogs, setTriggerLogs] = useState('')
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('forge:zapier_webhook') || ''
       setWebhookUrl(saved)
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [])
 
   function saveWebhook(val: string) {
     setWebhookUrl(val)
-    try { localStorage.setItem('forge:zapier_webhook', val) } catch { /* ignore */ }
+    try {
+      localStorage.setItem('forge:zapier_webhook', val)
+    } catch {
+      /* ignore */
+    }
   }
 
   async function handleSendTrigger() {
@@ -126,19 +150,43 @@ function ZapierPanel({ workspaceId }: { workspaceId: string }) {
       event: triggerEvent,
       workspaceId,
       timestamp: new Date().toISOString(),
-      data: triggerEvent === 'user.registered' ? {
-        id: 'usr_9x8f0a', email: 'novice-builder@saasytoad.dev', name: 'Novice Builder', plan: 'Pro Builder'
-      } : triggerEvent === 'payment.succeeded' ? {
-        id: 'txn_3f0a91', amount: 29.00, currency: 'usd', customer: 'novice-builder@saasytoad.dev'
-      } : {
-        id: 'form_7a0d11', formName: 'Contact Us', fields: { subject: 'Help with Zapier setup', message: 'This workspace is productive!' }
-      }
+      data:
+        triggerEvent === 'user.registered'
+          ? {
+              id: 'usr_9x8f0a',
+              email: 'novice-builder@saasytoad.dev',
+              name: 'Novice Builder',
+              plan: 'Pro Builder',
+            }
+          : triggerEvent === 'payment.succeeded'
+            ? {
+                id: 'txn_3f0a91',
+                amount: 29.0,
+                currency: 'usd',
+                customer: 'novice-builder@saasytoad.dev',
+              }
+            : {
+                id: 'form_7a0d11',
+                formName: 'Contact Us',
+                fields: {
+                  subject: 'Help with Zapier setup',
+                  message: 'This workspace is productive!',
+                },
+              },
     }
 
     try {
-      await fetch(webhookUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), mode: 'no-cors' })
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+        mode: 'no-cors',
+      })
       setTriggerStatus('success')
-      setTriggerLogs((p) => p + `✓ Trigger sent:\n${JSON.stringify(payload, null, 2)}\n\nZapier trigger success!`)
+      setTriggerLogs(
+        (p) =>
+          p + `✓ Trigger sent:\n${JSON.stringify(payload, null, 2)}\n\nZapier trigger success!`,
+      )
     } catch (err) {
       setTriggerStatus('failed')
       setTriggerLogs((p) => p + `Failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -148,23 +196,29 @@ function ZapierPanel({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="flex flex-col p-4 space-y-4 overflow-y-auto flex-1">
       <div>
-        <h3 className="font-cinzel text-xs font-bold text-zinc-300 uppercase tracking-wider">Zapier Automation</h3>
-        <p className="mt-1 text-[11px] text-zinc-550 leading-relaxed">
+        <h3 className="font-cinzel text-xs font-bold text-zinc-300 uppercase tracking-wider">
+          Zapier Automation
+        </h3>
+        <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">
           Link sandbox events to Zapier webhook triggers.
         </p>
       </div>
       <div className="space-y-1.5 border-t border-white/5 pt-3">
-        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-450 block">Zapier Webhook URL</label>
+        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+          Zapier Webhook URL
+        </label>
         <input
           type="text"
           value={webhookUrl}
           onChange={(e) => saveWebhook(e.target.value)}
           placeholder="https://hooks.zapier.com/hooks/catch/..."
-          className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-1.5 text-xs text-zinc-350 placeholder:text-zinc-650 focus:border-[var(--brass)]/50 focus:outline-none"
+          className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-1.5 text-xs text-zinc-350 placeholder:text-zinc-600 focus:border-[var(--brass)]/50 focus:outline-none"
         />
       </div>
       <div className="space-y-1.5 border-t border-white/5 pt-3">
-        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-450 block">Event Type</label>
+        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+          Event Type
+        </label>
         <select
           value={triggerEvent}
           onChange={(e) => setTriggerEvent(e.target.value)}
@@ -179,13 +233,15 @@ function ZapierPanel({ workspaceId }: { workspaceId: string }) {
         type="button"
         disabled={!webhookUrl || triggerStatus === 'sending'}
         onClick={handleSendTrigger}
-        className="w-full rounded-lg bg-zinc-800 text-[var(--brass)] border border-[var(--brass)]/30 hover:bg-zinc-750 px-3 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer disabled:opacity-50 transition"
+        className="w-full rounded-lg bg-zinc-800 text-[var(--brass)] border border-[var(--brass)]/30 hover:bg-zinc-700 px-3 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer disabled:opacity-50 transition"
       >
         {triggerStatus === 'sending' ? 'Sending…' : 'Fire webhook'}
       </button>
       {triggerLogs && (
         <div className="border-t border-white/5 pt-3 flex flex-col min-h-[160px] flex-1">
-          <span className="text-[9px] uppercase font-bold text-zinc-550 tracking-wider">Webhook Logs</span>
+          <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">
+            Webhook Logs
+          </span>
           <pre className="mt-1.5 flex-1 rounded-lg bg-black/60 p-3 font-mono text-[9px] text-emerald-450 overflow-auto border border-white/5 whitespace-pre-wrap">
             {triggerLogs}
           </pre>
@@ -251,14 +307,17 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
   const [suggestIndex, setSuggestIndex] = useState(0)
   const [suggestFiles, setSuggestFiles] = useState<string[]>([])
 
-  const COMMANDS = useMemo(() => [
-    { id: '/goal', label: '/goal <task>', desc: 'Run a thorough, goal-driven task' },
-    { id: '/explain', label: '/explain <file>', desc: 'Ask the agent to explain a file' },
-    { id: '/write-tests', label: '/write-tests <file>', desc: 'Ask the agent to write tests' },
-    { id: '/clear', label: '/clear', desc: 'Clear the chat timeline history' },
-    { id: '/stop', label: '/stop', desc: 'Stop the active agent execution' },
-    { id: '/help', label: '/help', desc: 'Display a list of commands' },
-  ], [])
+  const COMMANDS = useMemo(
+    () => [
+      { id: '/goal', label: '/goal <task>', desc: 'Run a thorough, goal-driven task' },
+      { id: '/explain', label: '/explain <file>', desc: 'Ask the agent to explain a file' },
+      { id: '/write-tests', label: '/write-tests <file>', desc: 'Ask the agent to write tests' },
+      { id: '/clear', label: '/clear', desc: 'Clear the chat timeline history' },
+      { id: '/stop', label: '/stop', desc: 'Stop the active agent execution' },
+      { id: '/help', label: '/help', desc: 'Display a list of commands' },
+    ],
+    [],
+  )
 
   const filteredFiles = useMemo(() => {
     if (!suggestFilter) return suggestFiles.slice(0, 15)
@@ -272,80 +331,55 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
     return COMMANDS.filter((cmd) => cmd.id.includes(f) || cmd.desc.toLowerCase().includes(f))
   }, [COMMANDS, suggestFilter])
 
-  const fetchFlatFiles = useCallback(async (dir = '', depth = 0): Promise<string[]> => {
-    if (depth > 4) return []
-    try {
-      const entries = await client.listFiles(workspaceId, dir)
-      const files: string[] = []
-      for (const entry of entries) {
-        if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'build' || entry.name === '.git') continue
-        if (entry.type === 'file') {
-          files.push(entry.path)
-        } else {
-          const sub = await fetchFlatFiles(entry.path, depth + 1)
-          files.push(...sub)
+  const fetchFlatFiles = useCallback(
+    async (dir = '', depth = 0): Promise<string[]> => {
+      if (depth > 4) return []
+      try {
+        const entries = await client.listFiles(workspaceId, dir)
+        const files: string[] = []
+        for (const entry of entries) {
+          if (
+            entry.name.startsWith('.') ||
+            entry.name === 'node_modules' ||
+            entry.name === 'dist' ||
+            entry.name === 'build' ||
+            entry.name === '.git'
+          )
+            continue
+          if (entry.type === 'file') {
+            files.push(entry.path)
+          } else {
+            const sub = await fetchFlatFiles(entry.path, depth + 1)
+            files.push(...sub)
+          }
         }
+        return files.slice(0, 100)
+      } catch {
+        return []
       }
-      return files.slice(0, 100)
-    } catch {
-      return []
-    }
-  }, [workspaceId])
+    },
+    [workspaceId],
+  )
 
   const loadWorkspaceFiles = useCallback(async () => {
     const files = await fetchFlatFiles()
     setSuggestFiles(files)
   }, [fetchFlatFiles])
 
-  const selectFile = useCallback((filePath: string) => {
-    setAttachedFiles((prev) => {
-      if (prev.includes(filePath)) return prev
-      return [...prev, filePath]
-    })
-    const val = input
-    const selStart = inputRef.current?.selectionStart ?? 0
-    const before = val.slice(0, selStart)
-    const after = val.slice(selStart)
-    const replacedBefore = before.replace(/@[^\s@]*$/, '')
-    setInput(replacedBefore + after)
-    setShowFileSuggest(false)
-    
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus()
-        const newPos = replacedBefore.length
-        inputRef.current.setSelectionRange(newPos, newPos)
-      }
-    }, 10)
-  }, [input])
-
-  const selectCommand = useCallback((cmd: typeof COMMANDS[number]) => {
-    if (cmd.id === '/clear') {
-      clearTimeline()
-      setInput('')
-      setShowCommandSuggest(false)
-      return
-    }
-    if (cmd.id === '/stop') {
-      cancelRun()
-      setInput('')
-      setShowCommandSuggest(false)
-      return
-    }
-
-    const val = input
-    const selStart = inputRef.current?.selectionStart ?? 0
-    const before = val.slice(0, selStart)
-    const after = val.slice(selStart)
-
-    if (cmd.id === '/explain' || cmd.id === '/write-tests') {
-      const replacedBefore = before.replace(/\/([^\s/]*)$/, `${cmd.id} @`)
+  const selectFile = useCallback(
+    (filePath: string) => {
+      setAttachedFiles((prev) => {
+        if (prev.includes(filePath)) return prev
+        return [...prev, filePath]
+      })
+      const val = input
+      const selStart = inputRef.current?.selectionStart ?? 0
+      const before = val.slice(0, selStart)
+      const after = val.slice(selStart)
+      const replacedBefore = before.replace(/@[^\s@]*$/, '')
       setInput(replacedBefore + after)
-      setShowCommandSuggest(false)
-      setShowFileSuggest(true)
-      setSuggestFilter('')
-      setSuggestIndex(0)
-      void loadWorkspaceFiles()
+      setShowFileSuggest(false)
+
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus()
@@ -353,21 +387,62 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
           inputRef.current.setSelectionRange(newPos, newPos)
         }
       }, 10)
-      return
-    }
+    },
+    [input],
+  )
 
-    const replacedBefore = before.replace(/\/([^\s/]*)$/, `${cmd.id} `)
-    setInput(replacedBefore + after)
-    setShowCommandSuggest(false)
-
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus()
-        const newPos = replacedBefore.length
-        inputRef.current.setSelectionRange(newPos, newPos)
+  const selectCommand = useCallback(
+    (cmd: (typeof COMMANDS)[number]) => {
+      if (cmd.id === '/clear') {
+        clearTimeline()
+        setInput('')
+        setShowCommandSuggest(false)
+        return
       }
-    }, 10)
-  }, [input, clearTimeline, cancelRun, COMMANDS, loadWorkspaceFiles])
+      if (cmd.id === '/stop') {
+        cancelRun()
+        setInput('')
+        setShowCommandSuggest(false)
+        return
+      }
+
+      const val = input
+      const selStart = inputRef.current?.selectionStart ?? 0
+      const before = val.slice(0, selStart)
+      const after = val.slice(selStart)
+
+      if (cmd.id === '/explain' || cmd.id === '/write-tests') {
+        const replacedBefore = before.replace(/\/([^\s/]*)$/, `${cmd.id} @`)
+        setInput(replacedBefore + after)
+        setShowCommandSuggest(false)
+        setShowFileSuggest(true)
+        setSuggestFilter('')
+        setSuggestIndex(0)
+        void loadWorkspaceFiles()
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus()
+            const newPos = replacedBefore.length
+            inputRef.current.setSelectionRange(newPos, newPos)
+          }
+        }, 10)
+        return
+      }
+
+      const replacedBefore = before.replace(/\/([^\s/]*)$/, `${cmd.id} `)
+      setInput(replacedBefore + after)
+      setShowCommandSuggest(false)
+
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+          const newPos = replacedBefore.length
+          inputRef.current.setSelectionRange(newPos, newPos)
+        }
+      }, 10)
+    },
+    [input, clearTimeline, cancelRun, COMMANDS, loadWorkspaceFiles],
+  )
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
@@ -375,7 +450,7 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
 
     const selStart = e.target.selectionStart ?? 0
     const textBefore = val.slice(0, selStart)
-    
+
     const atMatch = textBefore.match(/@([^\s@]*)$/)
     if (atMatch) {
       const filter = atMatch[1] ?? ''
@@ -419,15 +494,21 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
       useAgent.setState((s) => ({
         timeline: [
           ...s.timeline,
-          { id: Math.random().toString(), kind: 'message', role: 'user', text: '/help', ts: Date.now() },
+          {
+            id: Math.random().toString(),
+            kind: 'message',
+            role: 'user',
+            text: '/help',
+            ts: Date.now(),
+          },
           {
             id: Math.random().toString(),
             kind: 'message',
             role: 'assistant',
             text: `### Available Commands\n\n- \`/goal <task>\` - Run a thorough, goal-driven task\n- \`/explain <file>\` - Explain a file's code\n- \`/write-tests <file>\` - Generate unit tests for a file\n- \`/clear\` - Clear this session's chat history\n- \`/stop\` - Cancel the active agent run\n- \`/help\` - Show this help menu\n\n*Tip: Type \`@\` to mention files, or click the \`+\` button to attach them as context.*`,
-            ts: Date.now()
-          }
-        ]
+            ts: Date.now(),
+          },
+        ],
       }))
       return
     }
@@ -444,7 +525,8 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
 
     let commandPrefix = ''
     if (taskText.startsWith('/goal ')) {
-      commandPrefix = '[Goal-driven Execution Requested]: Please plan thoroughly and verify correctness using the workspace compiler and test runs.\n\n'
+      commandPrefix =
+        '[Goal-driven Execution Requested]: Please plan thoroughly and verify correctness using the workspace compiler and test runs.\n\n'
       taskText = taskText.slice(6)
     } else if (taskText.startsWith('/explain ')) {
       commandPrefix = 'Please explain the following code and walk through how it works:\n\n'
@@ -468,14 +550,16 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
     let finalPrompt = taskText
     if (allAttachments.length > 0) {
       try {
-        const fileContexts = await Promise.all(allAttachments.map(async (file) => {
-          try {
-            const contents = await client.readFile(workspaceId, file)
-            return `=== Context File: ${file} ===\n${contents}\n=== End of File ===`
-          } catch {
-            return `=== Context File: ${file} (Failed to read content) ===`
-          }
-        }))
+        const fileContexts = await Promise.all(
+          allAttachments.map(async (file) => {
+            try {
+              const contents = await client.readFile(workspaceId, file)
+              return `=== Context File: ${file} ===\n${contents}\n=== End of File ===`
+            } catch {
+              return `=== Context File: ${file} (Failed to read content) ===`
+            }
+          }),
+        )
         finalPrompt = `${fileContexts.join('\n\n')}\n\n${commandPrefix}${taskText}`
       } catch {
         finalPrompt = `${commandPrefix}${taskText}`
@@ -488,44 +572,54 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
     runTask(finalPrompt)
   }, [input, running, runTask, workspaceId, attachedFiles, clearTimeline, cancelRun])
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (showFileSuggest || showCommandSuggest) {
-      const listLength = showFileSuggest
-        ? filteredFiles.length
-        : filteredCommands.length
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (showFileSuggest || showCommandSuggest) {
+        const listLength = showFileSuggest ? filteredFiles.length : filteredCommands.length
 
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setSuggestIndex((prev) => (listLength > 0 ? (prev + 1) % listLength : 0))
-        return
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setSuggestIndex((prev) => (listLength > 0 ? (prev - 1 + listLength) % listLength : 0))
-        return
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault()
-        if (showFileSuggest && filteredFiles[suggestIndex]) {
-          selectFile(filteredFiles[suggestIndex])
-        } else if (showCommandSuggest && filteredCommands[suggestIndex]) {
-          selectCommand(filteredCommands[suggestIndex])
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setSuggestIndex((prev) => (listLength > 0 ? (prev + 1) % listLength : 0))
+          return
         }
-        return
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setSuggestIndex((prev) => (listLength > 0 ? (prev - 1 + listLength) % listLength : 0))
+          return
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault()
+          if (showFileSuggest && filteredFiles[suggestIndex]) {
+            selectFile(filteredFiles[suggestIndex])
+          } else if (showCommandSuggest && filteredCommands[suggestIndex]) {
+            selectCommand(filteredCommands[suggestIndex])
+          }
+          return
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          setShowFileSuggest(false)
+          setShowCommandSuggest(false)
+          return
+        }
       }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setShowFileSuggest(false)
-        setShowCommandSuggest(false)
-        return
-      }
-    }
 
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      void submit()
-    }
-  }, [showFileSuggest, showCommandSuggest, suggestIndex, filteredFiles, filteredCommands, selectFile, selectCommand, submit])
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        void submit()
+      }
+    },
+    [
+      showFileSuggest,
+      showCommandSuggest,
+      suggestIndex,
+      filteredFiles,
+      filteredCommands,
+      selectFile,
+      selectCommand,
+      submit,
+    ],
+  )
 
   const hasAgentContent = timeline.some((t) => t.kind !== 'message' || t.role === 'assistant')
   const showThinking = running && !hasAgentContent
@@ -536,36 +630,45 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
       <div className="flex border-b border-white/5 bg-black/25 text-[11px]">
         <button
           type="button"
-          onClick={() => { setActivePanelTab('agent'); setShowHistory(false) }}
+          onClick={() => {
+            setActivePanelTab('agent')
+            setShowHistory(false)
+          }}
           className={cn(
             'flex-1 text-center py-2 font-bold uppercase tracking-wider cursor-pointer border-b transition flex items-center justify-center gap-1.5',
             activePanelTab === 'agent' && !showHistory
               ? 'border-[var(--brass)] text-[var(--brass)] bg-white/[0.02]'
-              : 'border-transparent text-zinc-500 hover:text-zinc-350'
+              : 'border-transparent text-zinc-500 hover:text-zinc-350',
           )}
         >
           Agent
         </button>
         <button
           type="button"
-          onClick={() => { setActivePanelTab('agent'); setShowHistory(true) }}
+          onClick={() => {
+            setActivePanelTab('agent')
+            setShowHistory(true)
+          }}
           className={cn(
             'flex-1 text-center py-2 font-bold uppercase tracking-wider cursor-pointer border-b transition flex items-center justify-center gap-1.5',
             showHistory
               ? 'border-[var(--brass)] text-[var(--brass)] bg-white/[0.02]'
-              : 'border-transparent text-zinc-500 hover:text-zinc-350'
+              : 'border-transparent text-zinc-500 hover:text-zinc-350',
           )}
         >
           Sessions
         </button>
         <button
           type="button"
-          onClick={() => { setActivePanelTab('zapier'); setShowHistory(false) }}
+          onClick={() => {
+            setActivePanelTab('zapier')
+            setShowHistory(false)
+          }}
           className={cn(
             'flex-1 text-center py-2 font-bold uppercase tracking-wider cursor-pointer border-b transition flex items-center justify-center gap-1.5',
             activePanelTab === 'zapier' && !showHistory
               ? 'border-[var(--brass)] text-[var(--brass)] bg-white/[0.02]'
-              : 'border-transparent text-zinc-500 hover:text-zinc-350'
+              : 'border-transparent text-zinc-500 hover:text-zinc-350',
           )}
         >
           Zapier
@@ -593,11 +696,15 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
           <div className="flex items-center gap-2 border-b border-white/5 px-3 py-1.5 bg-black/10">
             <Toad className="h-4 w-4" />
             <span className="text-[12px] font-semibold text-zinc-300">Ronald Pipeline</span>
-            <span className="ml-auto inline-flex items-center gap-1.5 text-[10px] text-zinc-550">
+            <span className="ml-auto inline-flex items-center gap-1.5 text-[10px] text-zinc-500">
               <span
                 className={cn(
                   'h-1.5 w-1.5 rounded-full',
-                  running ? 'animate-pulse bg-[var(--brass)]' : connected ? 'bg-emerald-500' : 'bg-zinc-650',
+                  running
+                    ? 'animate-pulse bg-[var(--brass)]'
+                    : connected
+                      ? 'bg-emerald-500'
+                      : 'bg-zinc-600',
                 )}
               />
               {running ? 'working' : connected ? 'ready' : 'offline'}
@@ -632,9 +739,12 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
             {timeline.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center px-4 text-center select-none">
                 <Toad className="h-12 w-12 opacity-70" />
-                <p className="mt-4 text-sm text-zinc-350 font-cinzel tracking-wide">Ronald Agent Workbench</p>
+                <p className="mt-4 text-sm text-zinc-350 font-cinzel tracking-wide">
+                  Ronald Agent Workbench
+                </p>
                 <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500 max-w-[230px]">
-                  Describe a task and the AI crew will execute compiler runs and file modifications directly in your workspace.
+                  Describe a task and the AI crew will execute compiler runs and file modifications
+                  directly in your workspace.
                 </p>
                 <div className="mt-4 flex flex-col gap-1.5 w-full max-w-[240px]">
                   {[
@@ -645,7 +755,10 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                     <button
                       key={hint}
                       type="button"
-                      onClick={() => { setInput(hint); inputRef.current?.focus() }}
+                      onClick={() => {
+                        setInput(hint)
+                        inputRef.current?.focus()
+                      }}
                       className="w-full rounded-lg border border-white/8 bg-black/20 px-3 py-2 text-[11px] text-zinc-400 hover:border-white/15 hover:text-zinc-300 transition cursor-pointer text-left"
                     >
                       {hint}
@@ -732,7 +845,10 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                       )
                     case 'error':
                       return (
-                        <div key={item.id} className="rounded-xl bg-red-500/10 border border-red-500/25 px-3.5 py-3 text-[13px] text-red-400 flex items-start gap-2">
+                        <div
+                          key={item.id}
+                          className="rounded-xl bg-red-500/10 border border-red-500/25 px-3.5 py-3 text-[13px] text-red-400 flex items-start gap-2"
+                        >
                           <div className="flex-1">
                             <span>{item.text}</span>
                             {item.text && (
@@ -741,8 +857,11 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                                 className="ml-2 text-[11px] underline text-red-300 hover:text-red-200 cursor-pointer"
                                 onClick={() => {
                                   // Find the last user message and re-send it
-                                  const lastUser = [...timeline].reverse().find((t) => t.kind === 'message' && t.role === 'user')
-                                  if (lastUser && lastUser.kind === 'message') runTask(lastUser.text)
+                                  const lastUser = [...timeline]
+                                    .reverse()
+                                    .find((t) => t.kind === 'message' && t.role === 'user')
+                                  if (lastUser && lastUser.kind === 'message')
+                                    runTask(lastUser.text)
                                 }}
                               >
                                 Retry
@@ -766,7 +885,9 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
             {/* File Mentions Popup */}
             {showFileSuggest && filteredFiles.length > 0 && (
               <div className="absolute bottom-full left-3 right-3 z-20 mb-2 max-h-48 overflow-y-auto rounded-xl border border-white/10 bg-[#0c0c0e]/95 backdrop-blur-md p-1.5 shadow-2xl select-none">
-                <div className="px-2 py-1 text-[9px] font-bold text-zinc-550 uppercase tracking-wider">Workspace Files</div>
+                <div className="px-2 py-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
+                  Workspace Files
+                </div>
                 {filteredFiles.map((file, i) => (
                   <button
                     key={file}
@@ -774,7 +895,9 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                     onClick={() => selectFile(file)}
                     className={cn(
                       'w-full text-left text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer transition',
-                      i === suggestIndex ? 'bg-[var(--brass)]/15 text-[var(--brass)] font-semibold' : 'text-zinc-350 hover:bg-white/[0.03]'
+                      i === suggestIndex
+                        ? 'bg-[var(--brass)]/15 text-[var(--brass)] font-semibold'
+                        : 'text-zinc-350 hover:bg-white/[0.03]',
                     )}
                   >
                     <span className="truncate">{file}</span>
@@ -786,7 +909,9 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
             {/* Commands Popup */}
             {showCommandSuggest && filteredCommands.length > 0 && (
               <div className="absolute bottom-full left-3 right-3 z-20 mb-2 max-h-48 overflow-y-auto rounded-xl border border-white/10 bg-[#0c0c0e]/95 backdrop-blur-md p-1.5 shadow-2xl select-none">
-                <div className="px-2 py-1 text-[9px] font-bold text-zinc-550 uppercase tracking-wider">Action Commands</div>
+                <div className="px-2 py-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
+                  Action Commands
+                </div>
                 {filteredCommands.map((cmd, i) => (
                   <button
                     key={cmd.id}
@@ -794,11 +919,13 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                     onClick={() => selectCommand(cmd)}
                     className={cn(
                       'w-full text-left text-xs px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition',
-                      i === suggestIndex ? 'bg-[var(--brass)]/15 text-[var(--brass)] font-semibold' : 'text-zinc-350 hover:bg-white/[0.03]'
+                      i === suggestIndex
+                        ? 'bg-[var(--brass)]/15 text-[var(--brass)] font-semibold'
+                        : 'text-zinc-350 hover:bg-white/[0.03]',
                     )}
                   >
                     <span className="font-mono">{cmd.label}</span>
-                    <span className="text-[10px] text-zinc-550">{cmd.desc}</span>
+                    <span className="text-[10px] text-zinc-500">{cmd.desc}</span>
                   </button>
                 ))}
               </div>
@@ -808,7 +935,10 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
             {attachedFiles.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1.5 select-none">
                 {attachedFiles.map((file) => (
-                  <span key={file} className="inline-flex items-center gap-1 rounded bg-zinc-800 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300">
+                  <span
+                    key={file}
+                    className="inline-flex items-center gap-1 rounded bg-zinc-800 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300"
+                  >
                     <span>{file}</span>
                     <button
                       type="button"
@@ -823,7 +953,7 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
             )}
 
             {/* Controls row */}
-            <div className="mb-2 flex items-center gap-2 text-[10px] text-zinc-550 select-none">
+            <div className="mb-2 flex items-center gap-2 text-[10px] text-zinc-500 select-none">
               <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
                 <input
                   type="checkbox"
@@ -836,14 +966,18 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
 
               {/* @ mention hint */}
               <span className="text-zinc-700 shrink-0">|</span>
-              <span className="text-zinc-650 shrink-0">@ to mention, / for actions</span>
+              <span className="text-zinc-600 shrink-0">@ to mention, / for actions</span>
             </div>
 
             {/* Auto-resizing textarea input */}
-            <div className={cn(
-              'flex items-end gap-2 rounded-xl border bg-black/40 px-3 py-2 transition',
-              running ? 'border-[var(--brass)]/20' : 'border-white/10 focus-within:border-white/20'
-            )}>
+            <div
+              className={cn(
+                'flex items-end gap-2 rounded-xl border bg-black/40 px-3 py-2 transition',
+                running
+                  ? 'border-[var(--brass)]/20'
+                  : 'border-white/10 focus-within:border-white/20',
+              )}
+            >
               {/* + attachment button */}
               <button
                 type="button"
@@ -852,7 +986,12 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                 className="shrink-0 mb-0.5 rounded p-1 text-zinc-600 hover:text-zinc-400 hover:bg-white/5 transition cursor-pointer"
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 </svg>
               </button>
 
@@ -862,9 +1001,11 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={running ? 'Agent is working…' : 'Ask anything, @ to mention, / for actions'}
+                placeholder={
+                  running ? 'Agent is working…' : 'Ask anything, @ to mention, / for actions'
+                }
                 disabled={running}
-                className="w-full resize-none bg-transparent text-xs text-zinc-150 placeholder:text-zinc-650 focus:outline-none leading-relaxed disabled:opacity-50"
+                className="w-full resize-none bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none leading-relaxed disabled:opacity-50"
                 style={{ minHeight: '20px', maxHeight: '120px' }}
               />
               <button
@@ -875,7 +1016,12 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
                 className="shrink-0 rounded-lg bg-[var(--brass)] p-1.5 text-xs font-semibold text-black transition hover:brightness-110 disabled:opacity-40 cursor-pointer"
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19V5m-7 7l7-7 7 7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M12 19V5m-7 7l7-7 7 7"
+                  />
                 </svg>
               </button>
             </div>
@@ -884,9 +1030,17 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
             <div className="mt-1.5 flex items-center gap-2 select-none">
               <select
                 value={modelTier}
-                onChange={(e) => setModelTier(e.target.value as 'fast' | 'frontier' | 'fusion' | 'custom')}
+                onChange={(e) =>
+                  setModelTier(e.target.value as 'fast' | 'frontier' | 'fusion' | 'custom')
+                }
                 className="rounded-lg bg-black/60 border border-white/10 px-2 py-0.5 text-[10px] text-zinc-400 focus:border-[var(--brass)]/30 focus:outline-none cursor-pointer hover:border-white/15 transition appearance-none"
-                style={{ paddingRight: '18px', backgroundImage: `url("data:image/svg+xml,%3Csvg fill='%23666' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', backgroundSize: '12px' }}
+                style={{
+                  paddingRight: '18px',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg fill='%23666' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 4px center',
+                  backgroundSize: '12px',
+                }}
               >
                 <option value="fusion">Fusion (3-model panel)</option>
                 <option value="frontier">Frontier (Sonnet)</option>
@@ -907,10 +1061,13 @@ export function AgentPanel({ workspaceId }: { workspaceId: string }) {
 
               {/* Tier description */}
               <span className="text-[9px] text-zinc-700 truncate">
-                {modelTier === 'fusion' ? 'Best reasoning · 3 models fused'
-                  : modelTier === 'frontier' ? 'Claude Sonnet · single model'
-                  : modelTier === 'fast' ? 'Cheapest · fast tasks'
-                  : 'Specify custom OpenRouter model'}
+                {modelTier === 'fusion'
+                  ? 'Best reasoning · 3 models fused'
+                  : modelTier === 'frontier'
+                    ? 'Claude Sonnet · single model'
+                    : modelTier === 'fast'
+                      ? 'Cheapest · fast tasks'
+                      : 'Specify custom OpenRouter model'}
               </span>
 
               {/* Caret up icon to show the dropdown is expandable */}

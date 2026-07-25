@@ -29,7 +29,12 @@ export class DevAuthProvider implements AuthProvider {
     }
     if (this.users.has(key)) throw new AuthError('an account with that email already exists')
     const salt = randomBytes(16).toString('hex')
-    const user: StoredUser = { id: randomUUID(), email: key, salt, hash: hashPassword(password, salt) }
+    const user: StoredUser = {
+      id: randomUUID(),
+      email: key,
+      salt,
+      hash: hashPassword(password, salt),
+    }
     this.users.set(key, user)
     return this.createSession(user)
   }
@@ -55,7 +60,9 @@ export class DevAuthProvider implements AuthProvider {
   }
 
   private createSession(user: StoredUser): Session {
-    const authUser: AuthUser = { id: user.id, email: user.email }
+    // Dev auth has no back-office stamping; the admin store owns that. Local accounts are
+    // never owners, so a dev signup with an owner email carries no owner power.
+    const authUser: AuthUser = { id: user.id, email: user.email, forgeRole: null }
     const token = randomUUID()
     this.sessions.set(token, authUser)
     return { token, user: authUser }

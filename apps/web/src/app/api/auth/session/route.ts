@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { currentUser } from '@/lib/auth/server'
-import { isAdminEmail } from '@forge/shared'
 
 export async function GET() {
   const user = await currentUser()
   if (!user) return NextResponse.json({ user: null })
 
-  const adminEmails = process.env.ADMIN_EMAILS ?? 'admin@forge.dev'
-  const isAdmin = isAdminEmail(user.email, adminEmails)
+  // Back-office access follows the stamped forge_role, the same authority the admin store
+  // enforces. Matching a published owner/admin email address is not enough: a squatter who
+  // signed up through the customer flow would otherwise be shown the back-office door.
+  const isAdmin = user.forgeRole !== null
 
   return NextResponse.json({ user: { ...user, isAdmin } })
 }

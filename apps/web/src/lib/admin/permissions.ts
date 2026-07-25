@@ -9,10 +9,26 @@ export type AdminRole = 'owner' | 'admin'
 
 /** The back-office areas an owner can grant to an admin. */
 export const BACK_OFFICE_AREAS = [
-  { key: 'users', label: 'User and admin management', desc: 'Create and remove admins, set their access.' },
-  { key: 'billing', label: 'Billing and usage', desc: 'View revenue, plans, and spend across workspaces.' },
-  { key: 'system', label: 'System and config', desc: 'View service config, integration status, and health.' },
-  { key: 'content', label: 'Product and marketing', desc: 'Control product status and marketing copy.' },
+  {
+    key: 'users',
+    label: 'User and admin management',
+    desc: 'Create and remove admins, set their access.',
+  },
+  {
+    key: 'billing',
+    label: 'Billing and usage',
+    desc: 'View revenue, plans, and spend across workspaces.',
+  },
+  {
+    key: 'system',
+    label: 'System and config',
+    desc: 'View service config, integration status, and health.',
+  },
+  {
+    key: 'content',
+    label: 'Product and marketing',
+    desc: 'Control product status and marketing copy.',
+  },
 ] as const
 
 export type AreaKey = (typeof BACK_OFFICE_AREAS)[number]['key']

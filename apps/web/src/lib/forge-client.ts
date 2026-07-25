@@ -23,7 +23,11 @@ export function agentServiceBase(): string {
 }
 
 /** Derive a websocket channel URL from an http(s) base. Pure for testability. */
-export function toWsUrl(base: string, workspaceId: string, channel: 'shell' | 'agent' = 'shell'): string {
+export function toWsUrl(
+  base: string,
+  workspaceId: string,
+  channel: 'shell' | 'agent' = 'shell',
+): string {
   return `${base.replace(/^http/, 'ws')}/workspaces/${workspaceId}/${channel}`
 }
 
@@ -135,7 +139,9 @@ export async function getSessions(id: string): Promise<SessionDto[]> {
   return authed(`/workspaces/${id}/sessions`)
 }
 
-export async function createCheckout(planId: string): Promise<{ url: string; mode: 'mock' | 'stripe' }> {
+export async function createCheckout(
+  planId: string,
+): Promise<{ url: string; mode: 'mock' | 'stripe' }> {
   const res = await fetch('/api/billing/checkout', {
     method: 'POST',
     headers: JSON_HEADERS,
@@ -165,4 +171,3 @@ export async function getAdminStats(): Promise<{
 }> {
   return authed('/admin/stats')
 }
-

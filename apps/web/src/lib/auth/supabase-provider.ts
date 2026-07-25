@@ -1,6 +1,17 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { AuthProvider, AuthUser, Session } from './types'
+import type { AuthProvider, AuthUser, ForgeRole, Session } from './types'
 import { AuthError } from './types'
+
+/**
+ * Reads the back-office role stamped in Supabase app_metadata. app_metadata is writable
+ * only with the service-role key (the admin store's bootstrap/reclaim path), never by the
+ * user, so it is safe to trust here. Anything else, including a user-supplied user_metadata
+ * role, is ignored.
+ */
+export function readForgeRole(appMetadata: unknown): ForgeRole | null {
+  const role = (appMetadata as { forge_role?: unknown } | null | undefined)?.forge_role
+  return role === 'owner' || role === 'admin' ? role : null
+}
 
 export class SupabaseAuthProvider implements AuthProvider {
   private supabase: SupabaseClient
@@ -16,7 +27,11 @@ export class SupabaseAuthProvider implements AuthProvider {
 
     return {
       token: data.session.access_token,
-      user: { id: data.user.id, email: data.user.email ?? '' },
+      user: {
+        id: data.user.id,
+        email: data.user.email ?? '',
+        forgeRole: readForgeRole(data.user.app_metadata),
+      },
     }
   }
 
@@ -27,7 +42,11 @@ export class SupabaseAuthProvider implements AuthProvider {
 
     return {
       token: data.session.access_token,
-      user: { id: data.user.id, email: data.user.email ?? '' },
+      user: {
+        id: data.user.id,
+        email: data.user.email ?? '',
+        forgeRole: readForgeRole(data.user.app_metadata),
+      },
     }
   }
 
@@ -41,6 +60,10 @@ export class SupabaseAuthProvider implements AuthProvider {
     if (!token) return null
     const { data, error } = await this.supabase.auth.getUser(token)
     if (error || !data.user) return null
-    return { id: data.user.id, email: data.user.email ?? '' }
+    return {
+      id: data.user.id,
+      email: data.user.email ?? '',
+      forgeRole: readForgeRole(data.user.app_metadata),
+    }
   }
 }

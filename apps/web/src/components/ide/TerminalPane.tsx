@@ -2,10 +2,12 @@
 
 import { useEffect, useRef } from 'react'
 import { shellUrl } from '@/lib/forge-client'
+import { useIde } from '@/lib/store'
 import '@xterm/xterm/css/xterm.css'
 
 export function TerminalPane({ workspaceId }: { workspaceId: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const setTerminal = useIde((s) => s.setTerminal)
 
   useEffect(() => {
     let disposed = false
@@ -41,8 +43,22 @@ export function TerminalPane({ workspaceId }: { workspaceId: string }) {
       const onResize = () => fit.fit()
       window.addEventListener('resize', onResize)
 
+      // Hand the IDE chrome a handle on the real session, so Terminal and Run menu actions
+      // drive this shell rather than claiming work they never did.
+      setTerminal({
+        clear: () => term.clear(),
+        runCommand: (command) => {
+          if (socket.readyState !== WebSocket.OPEN) {
+            term.write(`\r\n[forge] shell is not connected, could not run: ${command}\r\n`)
+            return
+          }
+          socket.send(`${command}\r`)
+        },
+      })
+
       cleanup = () => {
         window.removeEventListener('resize', onResize)
+        setTerminal(null)
         socket.close()
         term.dispose()
       }
@@ -52,7 +68,7 @@ export function TerminalPane({ workspaceId }: { workspaceId: string }) {
       disposed = true
       cleanup()
     }
-  }, [workspaceId])
+  }, [workspaceId, setTerminal])
 
   return (
     <div className="flex h-full flex-col bg-[#0a0a0b]">

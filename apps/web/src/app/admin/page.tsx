@@ -52,7 +52,11 @@ export default function AdminPage() {
           return
         }
         setSession(d.admin)
-        setTab(d.admin.role === 'owner' || d.admin.permissions.includes('users') ? 'users' : (d.admin.permissions[0] ?? 'users'))
+        setTab(
+          d.admin.role === 'owner' || d.admin.permissions.includes('users')
+            ? 'users'
+            : (d.admin.permissions[0] ?? 'users'),
+        )
         setChecking(false)
       })
       .catch(() => active && router.replace('/admin/login'))
@@ -92,7 +96,9 @@ export default function AdminPage() {
           <div className="flex items-center gap-3">
             <Logo wordmark="Forge" markSize={34} showWordmark={false} />
             <div>
-              <h1 className="font-cinzel text-xl font-bold tracking-wider text-white">Owner console</h1>
+              <h1 className="font-cinzel text-xl font-bold tracking-wider text-white">
+                Owner console
+              </h1>
               <p className="text-xs text-zinc-500 mt-0.5">
                 Signed in as {session.email}
                 <span
@@ -109,10 +115,17 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/dashboard" className="rounded-lg border border-zinc-750 hover:bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 transition">
+            <Link
+              href="/dashboard"
+              className="rounded-lg border border-zinc-700 hover:bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 transition"
+            >
               App dashboard
             </Link>
-            <button type="button" onClick={() => void signOut()} className="rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-400 transition cursor-pointer">
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-400 transition cursor-pointer"
+            >
               Sign out
             </button>
           </div>
@@ -187,7 +200,9 @@ function AdminsTab({ session }: { session: AdminSession }) {
   }
 
   async function togglePerm(a: AdminRecord, area: AreaKey) {
-    const next = a.permissions.includes(area) ? a.permissions.filter((p) => p !== area) : [...a.permissions, area]
+    const next = a.permissions.includes(area)
+      ? a.permissions.filter((p) => p !== area)
+      : [...a.permissions, area]
     const res = await fetch(`/api/admin/admins/${a.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -207,21 +222,42 @@ function AdminsTab({ session }: { session: AdminSession }) {
       {isOwner && (
         <section className="glass-panel p-5 rounded-xl">
           <h2 className="font-cinzel text-sm font-bold text-zinc-200 mb-1">Add an admin</h2>
-          <p className="text-[11px] text-zinc-550 mb-4">Only you, an owner, can add admins. You set their password and exactly what they can see.</p>
+          <p className="text-[11px] text-zinc-500 mb-4">
+            Only you, an owner, can add admins. You set their password and exactly what they can
+            see.
+          </p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin email" type="email" className="rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-[var(--brass)]/50 focus:outline-none" />
-            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="set a password (8+ chars)" type="password" className="rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-[var(--brass)]/50 focus:outline-none" />
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin email"
+              type="email"
+              className="rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-[var(--brass)]/50 focus:outline-none"
+            />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="set a password (8+ chars)"
+              type="password"
+              className="rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-[var(--brass)]/50 focus:outline-none"
+            />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {BACK_OFFICE_AREAS.map((area) => (
               <button
                 key={area.key}
                 type="button"
-                onClick={() => setPerms((p) => (p.includes(area.key) ? p.filter((x) => x !== area.key) : [...p, area.key]))}
+                onClick={() =>
+                  setPerms((p) =>
+                    p.includes(area.key) ? p.filter((x) => x !== area.key) : [...p, area.key],
+                  )
+                }
                 title={area.desc}
                 className={cn(
                   'rounded-lg border px-2.5 py-1 text-[11px] font-medium transition cursor-pointer',
-                  perms.includes(area.key) ? 'border-[var(--brass)]/40 bg-[var(--brass)]/10 text-[var(--brass)]' : 'border-white/10 text-zinc-400 hover:text-zinc-200',
+                  perms.includes(area.key)
+                    ? 'border-[var(--brass)]/40 bg-[var(--brass)]/10 text-[var(--brass)]'
+                    : 'border-white/10 text-zinc-400 hover:text-zinc-200',
                 )}
               >
                 {area.label}
@@ -230,7 +266,12 @@ function AdminsTab({ session }: { session: AdminSession }) {
           </div>
           {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
           <div className="mt-4 flex justify-end">
-            <button type="button" disabled={creating || !email || !password} onClick={() => void createAdmin()} className="rounded-lg bg-[var(--brass)] text-black px-4 py-2 text-xs font-bold transition hover:brightness-110 disabled:opacity-40 cursor-pointer">
+            <button
+              type="button"
+              disabled={creating || !email || !password}
+              onClick={() => void createAdmin()}
+              className="rounded-lg bg-[var(--brass)] text-black px-4 py-2 text-xs font-bold transition hover:brightness-110 disabled:opacity-40 cursor-pointer"
+            >
               {creating ? 'Adding...' : 'Add admin'}
             </button>
           </div>
@@ -250,7 +291,11 @@ function AdminsTab({ session }: { session: AdminSession }) {
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-zinc-200 font-medium truncate">{a.email}</span>
                   {isOwner && (
-                    <button type="button" onClick={() => void remove(a)} className="text-[11px] text-red-400 hover:text-red-300 transition cursor-pointer shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => void remove(a)}
+                      className="text-[11px] text-red-400 hover:text-red-300 transition cursor-pointer shrink-0"
+                    >
                       Remove
                     </button>
                   )}
@@ -267,7 +312,9 @@ function AdminsTab({ session }: { session: AdminSession }) {
                         title={area.desc}
                         className={cn(
                           'rounded border px-2 py-0.5 text-[10px] font-medium transition',
-                          on ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-white/10 text-zinc-550',
+                          on
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                            : 'border-white/10 text-zinc-500',
                           isOwner ? 'cursor-pointer hover:brightness-110' : 'cursor-default',
                         )}
                       >
@@ -281,7 +328,9 @@ function AdminsTab({ session }: { session: AdminSession }) {
           </div>
         )}
         {!isOwner && (
-          <p className="mt-4 text-[11px] text-zinc-550">You can view admins. Only an owner can add, remove, or change access.</p>
+          <p className="mt-4 text-[11px] text-zinc-500">
+            You can view admins. Only an owner can add, remove, or change access.
+          </p>
         )}
       </section>
     </div>
@@ -304,17 +353,28 @@ function BillingTab() {
   }, [])
 
   if (error) return <div className="glass-panel p-5 rounded-xl text-xs text-amber-400">{error}</div>
-  if (!stats) return <div className="glass-panel p-5 rounded-xl text-xs text-zinc-500">Loading platform metrics...</div>
+  if (!stats)
+    return (
+      <div className="glass-panel p-5 rounded-xl text-xs text-zinc-500">
+        Loading platform metrics...
+      </div>
+    )
 
   const pct = Math.min(100, (stats.globalSpend / stats.caps.globalUsd) * 100)
   return (
     <div className="space-y-6">
       <section className="glass-panel p-6 rounded-2xl">
-        <h2 className="font-cinzel text-sm font-bold uppercase tracking-wider text-zinc-400 mb-4">Global spend</h2>
+        <h2 className="font-cinzel text-sm font-bold uppercase tracking-wider text-zinc-400 mb-4">
+          Global spend
+        </h2>
         <div className="grid gap-6 md:grid-cols-3 items-center">
           <div>
-            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Active spend</span>
-            <div className="text-3xl font-mono font-bold text-[var(--brass)]">${stats.globalSpend.toFixed(4)}</div>
+            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+              Active spend
+            </span>
+            <div className="text-3xl font-mono font-bold text-[var(--brass)]">
+              ${stats.globalSpend.toFixed(4)}
+            </div>
           </div>
           <div className="md:col-span-2 space-y-2">
             <div className="flex justify-between text-xs font-mono text-zinc-400">
@@ -322,19 +382,27 @@ function BillingTab() {
               <span>Cap ${stats.caps.globalUsd.toFixed(2)}</span>
             </div>
             <div className="h-3 w-full bg-zinc-950/60 rounded-lg overflow-hidden border border-white/5 p-0.5">
-              <div style={{ width: `${pct}%` }} className="h-full bg-gradient-to-r from-amber-600 to-yellow-500 rounded-md transition-all" />
+              <div
+                style={{ width: `${pct}%` }}
+                className="h-full bg-gradient-to-r from-amber-600 to-yellow-500 rounded-md transition-all"
+              />
             </div>
           </div>
         </div>
       </section>
       <section className="glass-panel p-5 rounded-xl">
-        <h2 className="font-cinzel text-xs font-bold uppercase tracking-wider text-zinc-300 mb-4">Workspaces ({stats.workspaces.length})</h2>
+        <h2 className="font-cinzel text-xs font-bold uppercase tracking-wider text-zinc-300 mb-4">
+          Workspaces ({stats.workspaces.length})
+        </h2>
         {stats.workspaces.length === 0 ? (
           <p className="text-xs text-zinc-500">No active sandboxes.</p>
         ) : (
           <div className="space-y-2 text-xs font-mono">
             {stats.workspaces.map((w) => (
-              <div key={w.id} className="flex justify-between border-b border-white/5 pb-1.5 last:border-0">
+              <div
+                key={w.id}
+                className="flex justify-between border-b border-white/5 pb-1.5 last:border-0"
+              >
                 <span className="text-[var(--brass)] truncate max-w-[200px]">{w.id}</span>
                 <span className="text-zinc-500">{new Date(w.createdAt).toLocaleString()}</span>
               </div>
@@ -350,9 +418,13 @@ function BillingTab() {
 function SystemTab() {
   const [config, setConfig] = useState<ConfigSummary | null>(null)
   useEffect(() => {
-    client.getConfig().then(setConfig).catch(() => setConfig(null))
+    client
+      .getConfig()
+      .then(setConfig)
+      .catch(() => setConfig(null))
   }, [])
-  if (!config) return <div className="glass-panel p-5 rounded-xl text-xs text-zinc-500">Loading config...</div>
+  if (!config)
+    return <div className="glass-panel p-5 rounded-xl text-xs text-zinc-500">Loading config...</div>
   const secrets = config.secrets as Record<string, boolean>
   return (
     <div className="space-y-6">
@@ -368,9 +440,14 @@ function SystemTab() {
         <h2 className="font-cinzel text-sm font-bold text-zinc-200 mb-4">Integrations</h2>
         <div className="grid gap-2 sm:grid-cols-2">
           {Object.entries(secrets).map(([name, on]) => (
-            <div key={name} className="flex items-center justify-between text-xs border-b border-white/5 pb-1.5">
+            <div
+              key={name}
+              className="flex items-center justify-between text-xs border-b border-white/5 pb-1.5"
+            >
               <span className="text-zinc-400 capitalize">{name}</span>
-              <span className={cn('font-bold', on ? 'text-emerald-400' : 'text-zinc-600')}>{on ? 'connected' : 'off'}</span>
+              <span className={cn('font-bold', on ? 'text-emerald-400' : 'text-zinc-600')}>
+                {on ? 'connected' : 'off'}
+              </span>
             </div>
           ))}
         </div>
@@ -437,7 +514,7 @@ function ProductTab() {
     <div className="space-y-6">
       <section className="glass-panel p-5 rounded-xl">
         <h2 className="font-cinzel text-sm font-bold text-zinc-200 mb-1">Forge launch status</h2>
-        <p className="text-[11px] text-zinc-550 mb-4 leading-relaxed">
+        <p className="text-[11px] text-zinc-500 mb-4 leading-relaxed">
           Set how Forge is presented on the marketing site. This saves to the live product config
           and the marketing site picks it up automatically.
         </p>
@@ -450,16 +527,21 @@ function ProductTab() {
               onClick={() => void choose(s.key)}
               className={cn(
                 'rounded-lg border px-3 py-1.5 text-xs font-semibold transition cursor-pointer disabled:opacity-50',
-                status === s.key ? 'border-[var(--brass)]/40 bg-[var(--brass)]/10 text-[var(--brass)]' : 'border-white/10 text-zinc-400 hover:text-zinc-200',
+                status === s.key
+                  ? 'border-[var(--brass)]/40 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-white/10 text-zinc-400 hover:text-zinc-200',
               )}
             >
               {s.label}
             </button>
           ))}
         </div>
-        <p className="mt-4 text-[11px] text-zinc-550">
-          Current status: <span className="text-zinc-300 font-semibold">{STATUSES.find((s) => s.key === status)?.label}</span>.
-          {note && <span className="ml-1 text-emerald-400">{note}</span>}
+        <p className="mt-4 text-[11px] text-zinc-500">
+          Current status:{' '}
+          <span className="text-zinc-300 font-semibold">
+            {STATUSES.find((s) => s.key === status)?.label}
+          </span>
+          .{note && <span className="ml-1 text-emerald-400">{note}</span>}
         </p>
       </section>
     </div>

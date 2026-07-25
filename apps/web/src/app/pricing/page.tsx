@@ -27,7 +27,9 @@ export default function PricingPage() {
       window.location.href = res.url
     } catch (err) {
       console.error('Checkout redirect failed:', err)
-      setError(err instanceof Error ? err.message : 'Failed to initiate checkout. Please try again.')
+      setError(
+        err instanceof Error ? err.message : 'Failed to initiate checkout. Please try again.',
+      )
       setLoadingPlanId(null)
     }
   }
@@ -37,7 +39,10 @@ export default function PricingPage() {
       <div className="mb-3 flex items-center gap-3">
         <Toad className="h-8 w-8" />
         <h1 className="text-2xl font-semibold tracking-tight text-white">Simple, flat pricing</h1>
-        <Link href="/workspaces" className="ml-auto text-sm text-zinc-400 transition hover:text-zinc-200">
+        <Link
+          href="/workspaces"
+          className="ml-auto text-sm text-zinc-400 transition hover:text-zinc-200"
+        >
           open workspace
         </Link>
       </div>
@@ -73,7 +78,7 @@ export default function PricingPage() {
                 key={plan.id}
                 className={cn(
                   'flex flex-col rounded-xl p-6 glass-panel glass-panel-hover relative overflow-hidden',
-                  isPro && 'glow-pro border-[var(--brass)]/30'
+                  isPro && 'glow-pro border-[var(--brass)]/30',
                 )}
               >
                 {isPro && (
@@ -83,15 +88,21 @@ export default function PricingPage() {
                 )}
                 <div className="text-sm font-medium text-zinc-400">{plan.name}</div>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold tracking-tight text-white">${plan.priceUsd}</span>
+                  <span className="text-4xl font-bold tracking-tight text-white">
+                    ${plan.priceUsd}
+                  </span>
                   <span className="text-sm text-zinc-500">/{plan.interval}</span>
                 </div>
-                <p className="mt-2 text-xs text-zinc-500 leading-relaxed min-h-[32px]">{plan.blurb}</p>
-                
+                <p className="mt-2 text-xs text-zinc-500 leading-relaxed min-h-[32px]">
+                  {plan.blurb}
+                </p>
+
                 <ul className="mt-6 space-y-2.5 text-xs text-zinc-300 flex-1">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2">
-                      <span className="text-[var(--brass)] font-semibold" aria-hidden>✓</span>
+                      <span className="text-[var(--brass)] font-semibold" aria-hidden>
+                        ✓
+                      </span>
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -106,7 +117,7 @@ export default function PricingPage() {
                     isPro
                       ? 'bg-[var(--brass)] text-black hover:brightness-110 shadow-lg shadow-[var(--brass)]/10'
                       : 'border border-zinc-700 text-zinc-200 hover:bg-white/5 hover:border-zinc-500',
-                    isAnyLoading && 'opacity-50 cursor-not-allowed'
+                    isAnyLoading && 'opacity-50 cursor-not-allowed',
                   )}
                 >
                   {isLoading ? (

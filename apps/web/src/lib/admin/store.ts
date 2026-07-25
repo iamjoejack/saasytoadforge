@@ -112,7 +112,8 @@ export class SupabaseAdminStore implements AdminStore {
       if (!owner) return { ok: false, error: 'Invalid email or password.' }
       const blocked = ownerBootstrapBlocked(opts)
       if (blocked) return { ok: false, error: blocked }
-      if (password.length < MIN_PASSWORD) return { ok: false, error: `Password must be at least ${MIN_PASSWORD} characters.` }
+      if (password.length < MIN_PASSWORD)
+        return { ok: false, error: `Password must be at least ${MIN_PASSWORD} characters.` }
       // First-time owner setup: create the owner, stamping the explicit owner role.
       const { error } = await this.service.auth.admin.createUser({
         email,
@@ -155,9 +156,17 @@ export class SupabaseAdminStore implements AdminStore {
       }
       return { ok: true, email: email.toLowerCase(), role: 'owner', permissions: [...ALL_AREAS] }
     }
-    if (role !== 'admin') return { ok: false, error: 'This account does not have back-office access.' }
-    const perms = sanitizeAreas((existing.app_metadata as { forge_permissions?: unknown }).forge_permissions)
-    return { ok: true, email: (existing.email ?? email).toLowerCase(), role: 'admin', permissions: perms }
+    if (role !== 'admin')
+      return { ok: false, error: 'This account does not have back-office access.' }
+    const perms = sanitizeAreas(
+      (existing.app_metadata as { forge_permissions?: unknown }).forge_permissions,
+    )
+    return {
+      ok: true,
+      email: (existing.email ?? email).toLowerCase(),
+      role: 'admin',
+      permissions: perms,
+    }
   }
 
   async listAdmins(): Promise<AdminRecord[]> {
@@ -169,14 +178,17 @@ export class SupabaseAdminStore implements AdminStore {
         id: u.id,
         email: u.email ?? '',
         role: 'admin' as const,
-        permissions: sanitizeAreas((u.app_metadata as { forge_permissions?: unknown }).forge_permissions),
+        permissions: sanitizeAreas(
+          (u.app_metadata as { forge_permissions?: unknown }).forge_permissions,
+        ),
         createdAt: u.created_at ?? '',
       }))
   }
 
   async createAdmin(email: string, password: string, permissions: AreaKey[]): Promise<AdminRecord> {
     if (isOwner(email)) throw new Error('That email is an owner and cannot be added as an admin.')
-    if (password.length < MIN_PASSWORD) throw new Error(`Password must be at least ${MIN_PASSWORD} characters.`)
+    if (password.length < MIN_PASSWORD)
+      throw new Error(`Password must be at least ${MIN_PASSWORD} characters.`)
     if (await this.findByEmail(email)) throw new Error('An account with that email already exists.')
     const { data, error } = await this.service.auth.admin.createUser({
       email,
@@ -243,7 +255,14 @@ export class InMemoryAdminStore implements AdminStore {
   readonly kind = 'memory' as const
   private readonly byEmail = new Map<
     string,
-    { id: string; email: string; role: AdminRole; permissions: AreaKey[]; passwordHash: string; createdAt: string }
+    {
+      id: string
+      email: string
+      role: AdminRole
+      permissions: AreaKey[]
+      passwordHash: string
+      createdAt: string
+    }
   >()
 
   async login(email: string, password: string, opts?: LoginOptions): Promise<LoginResult> {
@@ -254,7 +273,8 @@ export class InMemoryAdminStore implements AdminStore {
       if (!owner) return { ok: false, error: 'Invalid email or password.' }
       const blocked = ownerBootstrapBlocked(opts)
       if (blocked) return { ok: false, error: blocked }
-      if (password.length < MIN_PASSWORD) return { ok: false, error: `Password must be at least ${MIN_PASSWORD} characters.` }
+      if (password.length < MIN_PASSWORD)
+        return { ok: false, error: `Password must be at least ${MIN_PASSWORD} characters.` }
       this.byEmail.set(key, {
         id: crypto.randomUUID(),
         email: key,
@@ -265,7 +285,8 @@ export class InMemoryAdminStore implements AdminStore {
       })
       return { ok: true, email: key, role: 'owner', permissions: [...ALL_AREAS] }
     }
-    if (!verifyPassword(password, existing.passwordHash)) return { ok: false, error: 'Invalid email or password.' }
+    if (!verifyPassword(password, existing.passwordHash))
+      return { ok: false, error: 'Invalid email or password.' }
     if (owner) {
       // Owner requires the explicit stored owner role, not just an owner-listed email.
       // Reclaim an owner-email account lacking the role with the same proof bootstrap needs.
@@ -277,20 +298,28 @@ export class InMemoryAdminStore implements AdminStore {
       }
       return { ok: true, email: key, role: 'owner', permissions: [...ALL_AREAS] }
     }
-    if (existing.role !== 'admin') return { ok: false, error: 'This account does not have back-office access.' }
+    if (existing.role !== 'admin')
+      return { ok: false, error: 'This account does not have back-office access.' }
     return { ok: true, email: key, role: 'admin', permissions: existing.permissions }
   }
 
   async listAdmins(): Promise<AdminRecord[]> {
     return [...this.byEmail.values()]
       .filter((r) => r.role === 'admin')
-      .map(({ id, email, role, permissions, createdAt }) => ({ id, email, role, permissions, createdAt }))
+      .map(({ id, email, role, permissions, createdAt }) => ({
+        id,
+        email,
+        role,
+        permissions,
+        createdAt,
+      }))
   }
 
   async createAdmin(email: string, password: string, permissions: AreaKey[]): Promise<AdminRecord> {
     const key = email.trim().toLowerCase()
     if (isOwner(key)) throw new Error('That email is an owner and cannot be added as an admin.')
-    if (password.length < MIN_PASSWORD) throw new Error(`Password must be at least ${MIN_PASSWORD} characters.`)
+    if (password.length < MIN_PASSWORD)
+      throw new Error(`Password must be at least ${MIN_PASSWORD} characters.`)
     if (this.byEmail.has(key)) throw new Error('An account with that email already exists.')
     const record = {
       id: crypto.randomUUID(),

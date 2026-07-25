@@ -15,7 +15,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     await getAdminStore().removeAdmin(id)
     return NextResponse.json({ ok: true })
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Could not remove admin.' }, { status: 400 })
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Could not remove admin.' },
+      { status: 400 },
+    )
   }
 }
 
@@ -32,6 +35,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const record = await getAdminStore().setPermissions(id, sanitizeAreas(body.permissions))
     return NextResponse.json({ admin: record })
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Could not update access.' }, { status: 400 })
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Could not update access.' },
+      { status: 400 },
+    )
   }
 }
