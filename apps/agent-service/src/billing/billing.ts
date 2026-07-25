@@ -11,7 +11,12 @@ export const PLANS: readonly Plan[] = [
     priceUsd: 29,
     interval: 'month',
     blurb: 'Complete AI-powered visual development workspace.',
-    features: ['AI included, never metered', 'Unlimited microVM sandboxes', 'One-click deployments', 'Zapier, GitHub, Supabase integration'],
+    features: [
+      'AI included, never metered',
+      'Unlimited microVM sandboxes',
+      'One-click deployments',
+      'Zapier, GitHub, Supabase integration',
+    ],
   },
   {
     id: 'topup_10',
@@ -29,6 +34,11 @@ export interface WebhookFulfillment {
   customerEmail?: string
   /** USD of credit to grant (one-time top-ups); 0 for recurring subscriptions. */
   creditUsd: number
+  /**
+   * The provider's event id. Stripe delivers at least once and retries on any non-2xx or
+   * timeout, so the caller keys idempotency off this and grants a given event only once.
+   */
+  eventId?: string
 }
 
 /** Credit granted by a one-time plan. Subscriptions grant 0 (access, not credit). */
@@ -54,10 +64,7 @@ export class MockBillingProvider implements BillingProvider {
     return PLANS
   }
 
-  async createCheckout(
-    planId: string,
-    _opts: { customerEmail: string },
-  ): Promise<CheckoutResult> {
+  async createCheckout(planId: string, _opts: { customerEmail: string }): Promise<CheckoutResult> {
     return { url: `/pricing?selected=${encodeURIComponent(planId)}`, mode: 'mock' }
   }
 

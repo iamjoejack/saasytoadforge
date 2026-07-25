@@ -70,6 +70,7 @@ export class StripeBillingProvider implements BillingProvider {
       planId,
       customerEmail: session.customer_email ?? session.customer_details?.email ?? undefined,
       creditUsd: creditUsdForPlan(planId),
+      eventId: event.id,
     }
   }
 }

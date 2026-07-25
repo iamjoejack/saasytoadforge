@@ -49,6 +49,8 @@ export class SpendLedger {
   private readonly userExtraCredits = new Map<string, number>()
   /** Extra credits keyed by email, so a paid top-up (webhook carries only the email) is attributable. */
   private readonly emailExtraCredits = new Map<string, number>()
+  /** Stripe event ids already fulfilled, so a redelivered webhook cannot grant twice. */
+  private readonly fulfilledEvents = new Set<string>()
   private total = 0
 
   record(userId: string, usd: number): void {
@@ -68,10 +70,23 @@ export class SpendLedger {
     return this.userExtraCredits.get(userId) ?? 0
   }
 
-  /** Credit a paid top-up by email (fulfilled from a verified Stripe webhook). */
-  addEmailCredits(email: string, usd: number): void {
+  /**
+   * Credit a paid top-up by email (fulfilled from a verified Stripe webhook).
+   *
+   * Pass the Stripe event id to make the grant idempotent. Stripe delivers at least once and
+   * retries on any non-2xx or timeout, so without this a single purchase whose delivery blips
+   * grants its credit again on every redelivery. Returns false when the event was already
+   * applied. Held in memory alongside the credits themselves, so a restart clears both
+   * together and a redelivery then re-grants against a ledger that also reset.
+   */
+  addEmailCredits(email: string, usd: number, eventId?: string): boolean {
+    if (eventId) {
+      if (this.fulfilledEvents.has(eventId)) return false
+      this.fulfilledEvents.add(eventId)
+    }
     const key = email.toLowerCase()
     this.emailExtraCredits.set(key, (this.emailExtraCredits.get(key) ?? 0) + usd)
+    return true
   }
 
   emailCreditsAmount(email?: string): number {
