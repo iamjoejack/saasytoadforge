@@ -23,6 +23,7 @@ export default function WorkspacesPage() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -58,6 +59,12 @@ export default function WorkspacesPage() {
   }
 
   async function remove(id: string) {
+    // First tap arms the confirm; second tap actually deletes.
+    if (confirmingId !== id) {
+      setConfirmingId(id)
+      return
+    }
+    setConfirmingId(null)
     setItems((current) => (current ?? []).filter((w) => w.id !== id))
     await client.deleteWorkspace(id).catch(() => {})
   }
@@ -77,8 +84,14 @@ export default function WorkspacesPage() {
         </span>
         {email ? (
           <span className="inline-flex items-center gap-3">
-            <span>signed in as <strong className="text-zinc-400 font-medium">{email}</strong></span>
-            <button type="button" onClick={() => void signOut()} className="transition hover:text-zinc-300 cursor-pointer">
+            <span>
+              signed in as <strong className="text-zinc-400 font-medium">{email}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="transition hover:text-zinc-300 cursor-pointer"
+            >
               sign out
             </button>
           </span>
@@ -89,9 +102,7 @@ export default function WorkspacesPage() {
         <Toad className="h-9 w-9 shadow-md shadow-black/40 ring-1 ring-[var(--brass)]/20" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Workspaces</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Isolated code-execution sandboxes
-          </p>
+          <p className="text-xs text-zinc-500 mt-0.5">Isolated code-execution sandboxes</p>
         </div>
         <button
           type="button"
@@ -134,7 +145,7 @@ export default function WorkspacesPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              
+
               <div className="flex flex-col min-w-0 flex-1">
                 <Link
                   href={`/workspaces/${ws.id}`}
@@ -146,13 +157,18 @@ export default function WorkspacesPage() {
                   Created {new Date(ws.createdAt).toLocaleString()}
                 </span>
               </div>
-              
+
               <button
                 type="button"
                 onClick={() => void remove(ws.id)}
-                className="text-xs font-semibold text-zinc-500 transition hover:text-red-400 cursor-pointer border border-transparent hover:border-red-500/20 hover:bg-red-500/5 px-2.5 py-1 rounded-md"
+                onBlur={() => setConfirmingId((c) => (c === ws.id ? null : c))}
+                className={
+                  confirmingId === ws.id
+                    ? 'text-xs font-semibold text-red-400 cursor-pointer border border-red-500/30 bg-red-500/10 px-2.5 py-1 rounded-md transition'
+                    : 'text-xs font-semibold text-zinc-500 transition hover:text-red-400 cursor-pointer border border-transparent hover:border-red-500/20 hover:bg-red-500/5 px-2.5 py-1 rounded-md'
+                }
               >
-                delete
+                {confirmingId === ws.id ? 'tap again to delete' : 'delete'}
               </button>
             </div>
           ))
