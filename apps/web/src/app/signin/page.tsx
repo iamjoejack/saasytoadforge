@@ -79,9 +79,12 @@ function SignInForm() {
         {isOwner && (
           <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-[var(--brass)]/30 bg-[var(--brass)]/8 px-3.5 py-3">
             <div>
-              <p className="text-[12px] font-bold text-[var(--brass)] leading-snug">Owner account</p>
+              <p className="text-[12px] font-bold text-[var(--brass)] leading-snug">
+                Owner account
+              </p>
               <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-                This account has <strong className="text-white">unlimited</strong> agent access with no token or spending limits.
+                This account has <strong className="text-white">unlimited</strong> agent access with
+                no token or spending limits.
               </p>
             </div>
           </div>
@@ -101,7 +104,7 @@ function SignInForm() {
               className={cn(
                 'w-full rounded-lg border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 transition-all',
                 'focus:border-[var(--brass)]/50 focus:ring-1 focus:ring-[var(--brass)]/20 focus:outline-none',
-                isOwner && 'border-[var(--brass)]/25 bg-[var(--brass)]/5'
+                isOwner && 'border-[var(--brass)]/25 bg-[var(--brass)]/5',
               )}
             />
           </div>
@@ -117,7 +120,7 @@ function SignInForm() {
               placeholder="8+ characters"
               className={cn(
                 'w-full rounded-lg border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 transition-all',
-                'focus:border-[var(--brass)]/50 focus:ring-1 focus:ring-[var(--brass)]/20 focus:outline-none'
+                'focus:border-[var(--brass)]/50 focus:ring-1 focus:ring-[var(--brass)]/20 focus:outline-none',
               )}
             />
           </div>
@@ -137,7 +140,7 @@ function SignInForm() {
                 className={cn(
                   'w-full rounded-lg border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 transition-all',
                   'focus:border-[var(--brass)]/50 focus:ring-1 focus:ring-[var(--brass)]/20 focus:outline-none',
-                  confirm && password !== confirm ? 'border-red-500/50' : ''
+                  confirm && password !== confirm ? 'border-red-500/50' : '',
                 )}
               />
               {confirm && password !== confirm && (
@@ -160,7 +163,7 @@ function SignInForm() {
               'hover:brightness-110 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg',
               isOwner
                 ? 'bg-gradient-to-r from-[var(--brass)] to-[var(--copper)] text-black shadow-[var(--brass)]/15'
-                : 'bg-[var(--brass)] text-black shadow-[var(--brass)]/10'
+                : 'bg-[var(--brass)] text-black shadow-[var(--brass)]/10',
             )}
           >
             {busy ? (
@@ -171,8 +174,12 @@ function SignInForm() {
             ) : (
               <span>
                 {mode === 'signin'
-                  ? isOwner ? 'Sign in as owner' : 'Sign in'
-                  : isOwner ? 'Create owner account' : 'Create account'}
+                  ? isOwner
+                    ? 'Sign in as owner'
+                    : 'Sign in'
+                  : isOwner
+                    ? 'Create owner account'
+                    : 'Create account'}
               </span>
             )}
           </button>
@@ -189,9 +196,14 @@ function SignInForm() {
             }}
             className="text-xs text-zinc-400 transition hover:text-zinc-200 cursor-pointer"
           >
-            {mode === 'signin' ? "Don't have an account? Create one" : 'Already have an account? Sign in'}
+            {mode === 'signin'
+              ? "Don't have an account? Create one"
+              : 'Already have an account? Sign in'}
           </button>
-          <a href="/admin/login" className="text-[11px] text-zinc-600 hover:text-[var(--brass)] transition">
+          <a
+            href="/admin/login"
+            className="text-[11px] text-zinc-600 hover:text-[var(--brass)] transition"
+          >
             Owner or admin? Sign in to the back office
           </a>
 
@@ -209,8 +221,9 @@ function SignInForm() {
 
         {/* Owner setup hint — only on first visit */}
         {isOwnerSetup && mode === 'signup' && (
-          <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 text-[10px] text-zinc-450 leading-relaxed">
-            <strong className="text-emerald-400">Setup tip:</strong> Choose a strong password. Once created, this account bypasses all spending limits and has full admin access to Forge.
+          <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 text-[10px] text-zinc-400 leading-relaxed">
+            <strong className="text-emerald-400">Setup tip:</strong> Choose a strong password. Once
+            created, this account bypasses all spending limits and has full admin access to Forge.
           </div>
         )}
       </div>

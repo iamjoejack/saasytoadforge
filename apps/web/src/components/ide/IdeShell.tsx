@@ -31,7 +31,7 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
   const setTheme = useIde((s) => s.setTheme)
   const viewMode = useIde((s) => s.viewMode)
   const setViewMode = useIde((s) => s.setViewMode)
-  
+
   const [showAbout, setShowAbout] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
 
@@ -81,19 +81,33 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
 
   function handleRunTests() {
     setActiveMenu(null)
-    alert('Initiating workspace unit test suite. Test results will stream in the background console.')
+    alert(
+      'Initiating workspace unit test suite. Test results will stream in the background console.',
+    )
   }
 
   const menus = [
     {
       name: 'File',
       items: [
-        { label: 'New file...', action: () => { useAgent.setState((s) => ({ fileVersion: s.fileVersion + 1 })); alert('Use the new-file button in the Files sidebar to name your new file.'); } },
-        { label: 'New folder...', action: () => { useAgent.setState((s) => ({ fileVersion: s.fileVersion + 1 })); alert('Use the new-folder button in the Files sidebar to name your new folder.'); } },
+        {
+          label: 'New file...',
+          action: () => {
+            useAgent.setState((s) => ({ fileVersion: s.fileVersion + 1 }))
+            alert('Use the new-file button in the Files sidebar to name your new file.')
+          },
+        },
+        {
+          label: 'New folder...',
+          action: () => {
+            useAgent.setState((s) => ({ fileVersion: s.fileVersion + 1 }))
+            alert('Use the new-folder button in the Files sidebar to name your new folder.')
+          },
+        },
         { label: 'Save active file', action: handleSave, disabled: !activePath },
         { label: 'Close active tab', action: handleClose, disabled: !activePath },
-        { label: 'Back to workspaces', action: () => window.location.href = '/workspaces' }
-      ]
+        { label: 'Back to workspaces', action: () => (window.location.href = '/workspaces') },
+      ],
     },
     {
       name: 'Edit',
@@ -101,53 +115,93 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
         { label: 'Undo edit', action: () => runEditorAction('undo') },
         { label: 'Redo edit', action: () => runEditorAction('redo') },
         { label: 'Select all', action: () => runEditorAction('editor.action.selectAll') },
-        { label: 'Insert block component', action: () => { setActiveTab('blocks'); } }
-      ]
+        {
+          label: 'Insert block component',
+          action: () => {
+            setActiveTab('blocks')
+          },
+        },
+      ],
     },
     {
       name: 'Selection',
       items: [
-        { label: 'Expand selection', action: () => runEditorAction('editor.action.smartSelect.expand') },
-        { label: 'Shrink selection', action: () => runEditorAction('editor.action.smartSelect.shrink') }
-      ]
+        {
+          label: 'Expand selection',
+          action: () => runEditorAction('editor.action.smartSelect.expand'),
+        },
+        {
+          label: 'Shrink selection',
+          action: () => runEditorAction('editor.action.smartSelect.shrink'),
+        },
+      ],
     },
     {
       name: 'View',
       items: [
-        { label: activeTab === 'files' ? 'Files tab (active)' : 'Files tab', action: () => setActiveTab('files') },
-        { label: activeTab === 'blocks' ? 'Blocks tab (active)' : 'Blocks tab', action: () => setActiveTab('blocks') },
-        { label: viewMode === 'editor' ? 'Code editor (active)' : 'Code editor', action: () => setViewMode('editor') },
-        { label: viewMode === 'browser' ? 'Live preview (active)' : 'Live preview', action: () => setViewMode('browser') },
-        { label: `Toggle theme (${theme === 'slate' ? 'slate' : 'steampunk'})`, action: () => setTheme(theme === 'slate' ? 'steampunk' : 'slate') }
-      ]
+        {
+          label: activeTab === 'files' ? 'Files tab (active)' : 'Files tab',
+          action: () => setActiveTab('files'),
+        },
+        {
+          label: activeTab === 'blocks' ? 'Blocks tab (active)' : 'Blocks tab',
+          action: () => setActiveTab('blocks'),
+        },
+        {
+          label: viewMode === 'editor' ? 'Code editor (active)' : 'Code editor',
+          action: () => setViewMode('editor'),
+        },
+        {
+          label: viewMode === 'browser' ? 'Live preview (active)' : 'Live preview',
+          action: () => setViewMode('browser'),
+        },
+        {
+          label: `Toggle theme (${theme === 'slate' ? 'slate' : 'steampunk'})`,
+          action: () => setTheme(theme === 'slate' ? 'steampunk' : 'slate'),
+        },
+      ],
     },
     {
       name: 'Go',
-      items: [
-        { label: 'Go to line...', action: handleGoToLine, disabled: !editorInstance }
-      ]
+      items: [{ label: 'Go to line...', action: handleGoToLine, disabled: !editorInstance }],
     },
     {
       name: 'Run',
       items: [
         { label: 'Review and deploy', action: () => handleDeploy() },
         { label: 'Run unit tests', action: handleRunTests },
-        { label: 'Reload preview', action: () => { setViewMode('browser'); window.location.reload(); } }
-      ]
+        {
+          label: 'Reload preview',
+          action: () => {
+            setViewMode('browser')
+            window.location.reload()
+          },
+        },
+      ],
     },
     {
       name: 'Terminal',
-      items: [
-        { label: 'Clear console', action: () => alert('Terminal console reset complete.') }
-      ]
+      items: [{ label: 'Clear console', action: () => alert('Terminal console reset complete.') }],
     },
     {
       name: 'Help',
       items: [
-        { label: 'Keyboard shortcuts', action: () => { setActiveMenu(null); setShowShortcuts(true); } },
-        { label: 'About SaaSyToad Forge', action: () => { setActiveMenu(null); setShowAbout(true); } }
-      ]
-    }
+        {
+          label: 'Keyboard shortcuts',
+          action: () => {
+            setActiveMenu(null)
+            setShowShortcuts(true)
+          },
+        },
+        {
+          label: 'About SaaSyToad Forge',
+          action: () => {
+            setActiveMenu(null)
+            setShowAbout(true)
+          },
+        },
+      ],
+    },
   ]
 
   return (
@@ -167,15 +221,18 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
                   'px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded transition cursor-pointer border',
                   isOpen
                     ? 'bg-zinc-800 text-[var(--brass)] border-[var(--brass)]/30'
-                    : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-white/5'
+                    : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-white/5',
                 )}
               >
                 {m.name}
               </button>
-              
+
               {isOpen && (
                 <>
-                  <div className="fixed inset-0 z-40 cursor-default" onClick={() => setActiveMenu(null)} />
+                  <div
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setActiveMenu(null)}
+                  />
                   <div className="absolute left-0 mt-1.5 w-44 rounded-lg border border-white/10 bg-[#0e0e12] p-1.5 shadow-2xl z-50 animate-fade-in text-left">
                     {m.items.map((it, idx) => (
                       <button
@@ -205,7 +262,7 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
                 <Toad className="h-9 w-9" />
               </div>
             </div>
-            
+
             <div className="space-y-1">
               <h2 className="font-cinzel text-lg font-bold text-white tracking-wider">
                 SaaSyToad Forge
@@ -219,10 +276,12 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
             </div>
 
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Forge is a premium, agent-first visual-code development workbench designed for both novice creators and pro developers. Booted with microVM execution containers, Stripe Billing, and direct Zapier API webhook triggers.
+              Forge is a premium, agent-first visual-code development workbench designed for both
+              novice creators and pro developers. Booted with microVM execution containers, Stripe
+              Billing, and direct Zapier API webhook triggers.
             </p>
 
-            <div className="text-[9px] text-zinc-550 border-t border-white/5 pt-3">
+            <div className="text-[9px] text-zinc-500 border-t border-white/5 pt-3">
               Ronald SaaSyToad Mascot & Crew © 2026
             </div>
 
@@ -255,30 +314,40 @@ function IdeMenuBar({ workspaceId, activeTab, setActiveTab, handleDeploy }: Menu
             <div className="space-y-2 text-xs text-zinc-300 max-h-[260px] overflow-y-auto">
               <div className="flex justify-between border-b border-white/5 pb-1">
                 <span>Save Active File</span>
-                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">Ctrl + S</kbd>
+                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">
+                  Ctrl + S
+                </kbd>
               </div>
               <div className="flex justify-between border-b border-white/5 pb-1">
                 <span>Undo Edit</span>
-                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">Ctrl + Z</kbd>
+                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">
+                  Ctrl + Z
+                </kbd>
               </div>
               <div className="flex justify-between border-b border-white/5 pb-1">
                 <span>Redo Edit</span>
-                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">Ctrl + Y</kbd>
+                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">
+                  Ctrl + Y
+                </kbd>
               </div>
               <div className="flex justify-between border-b border-white/5 pb-1">
                 <span>Select All</span>
-                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">Ctrl + A</kbd>
+                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">
+                  Ctrl + A
+                </kbd>
               </div>
               <div className="flex justify-between border-b border-white/5 pb-1">
                 <span>Quick Line Go</span>
-                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">Ctrl + G</kbd>
+                <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--brass)]">
+                  Ctrl + G
+                </kbd>
               </div>
             </div>
             <div className="flex justify-end pt-1">
               <button
                 type="button"
                 onClick={() => setShowShortcuts(false)}
-                className="rounded bg-zinc-800 border border-zinc-700 hover:border-zinc-550 px-4 py-1.5 text-xs font-semibold text-zinc-200 transition cursor-pointer"
+                className="rounded bg-zinc-800 border border-zinc-700 hover:border-zinc-500 px-4 py-1.5 text-xs font-semibold text-zinc-200 transition cursor-pointer"
               >
                 Close Shortcuts
               </button>
@@ -330,13 +399,28 @@ function IdeStatusBar({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <div className="flex items-center h-5 border-t border-white/5 bg-[#0a0a0c] px-2 text-[10px] text-zinc-550 select-none overflow-hidden gap-0">
+    <div className="flex items-center h-5 border-t border-white/5 bg-[#0a0a0c] px-2 text-[10px] text-zinc-500 select-none overflow-hidden gap-0">
       {/* Left: agent/connection status */}
-      <div className={cn(
-        'flex items-center gap-1 px-2 h-full font-medium',
-        running ? 'bg-[var(--brass)]/15 text-[var(--brass)]' : connected ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-800 text-zinc-500'
-      )}>
-        <span className={cn('h-1.5 w-1.5 rounded-full', running ? 'bg-[var(--brass)] animate-pulse' : connected ? 'bg-emerald-500' : 'bg-zinc-600')} />
+      <div
+        className={cn(
+          'flex items-center gap-1 px-2 h-full font-medium',
+          running
+            ? 'bg-[var(--brass)]/15 text-[var(--brass)]'
+            : connected
+              ? 'bg-emerald-500/10 text-emerald-500'
+              : 'bg-zinc-800 text-zinc-500',
+        )}
+      >
+        <span
+          className={cn(
+            'h-1.5 w-1.5 rounded-full',
+            running
+              ? 'bg-[var(--brass)] animate-pulse'
+              : connected
+                ? 'bg-emerald-500'
+                : 'bg-zinc-600',
+          )}
+        />
         <span>{running ? 'Agent running' : connected ? 'Agent ready' : 'Offline'}</span>
       </div>
 
@@ -362,7 +446,9 @@ function IdeStatusBar({ workspaceId }: { workspaceId: string }) {
 
       {/* Cursor position */}
       <div className="h-full w-px bg-white/5 mx-0.5" />
-      <span className="px-2 tabular-nums">Ln {cursorPos.line}, Col {cursorPos.col}</span>
+      <span className="px-2 tabular-nums">
+        Ln {cursorPos.line}, Col {cursorPos.col}
+      </span>
 
       {/* Indentation */}
       <div className="h-full w-px bg-white/5 mx-0.5" />
@@ -394,8 +480,18 @@ function IdeStatusBar({ workspaceId }: { workspaceId: string }) {
         title="Open Settings"
       >
         <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+          />
         </svg>
         Forge · Settings
       </Link>
@@ -408,11 +504,14 @@ function IdeStatusBar({ workspaceId }: { workspaceId: string }) {
         title="Notifications"
       >
         <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+          />
         </svg>
-        {notifCount > 0 && (
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]" />
-        )}
+        {notifCount > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]" />}
       </button>
     </div>
   )
@@ -474,11 +573,17 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
           <Logo wordmark="Forge" markSize={20} />
         </Link>
         <span className="text-zinc-700 select-none">/</span>
-        <Link href="/workspaces" className="text-xs text-zinc-400 transition hover:text-zinc-200 select-none shrink-0">
+        <Link
+          href="/workspaces"
+          className="text-xs text-zinc-400 transition hover:text-zinc-200 select-none shrink-0"
+        >
           workspaces
         </Link>
         <span className="text-zinc-700 select-none">/</span>
-        <span className="font-mono text-[10px] text-zinc-550 shrink-0 select-none" title={workspaceId}>
+        <span
+          className="font-mono text-[10px] text-zinc-500 shrink-0 select-none"
+          title={workspaceId}
+        >
           {workspaceId.slice(0, 10)}...
         </span>
 
@@ -504,7 +609,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
           {theme === 'slate' ? 'Steampunk UI' : 'Modern UI'}
         </button>
 
-        <span className="text-zinc-850 select-none">|</span>
+        <span className="text-zinc-800 select-none">|</span>
 
         {/* Deploy controls (Ronald reviews first) */}
         <div className="flex items-center gap-2 select-none shrink-0">
@@ -573,7 +678,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
           )}
         </div>
 
-        <span className="text-zinc-850 select-none">|</span>
+        <span className="text-zinc-800 select-none">|</span>
         <Link
           href="/settings"
           className="text-xs text-zinc-400 transition hover:text-zinc-200 select-none shrink-0"
@@ -597,7 +702,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
                 'flex-1 text-center py-2 font-semibold uppercase tracking-wider cursor-pointer border-b transition',
                 activeTab === 'files'
                   ? 'border-[var(--brass)] text-[var(--brass)] bg-white/[0.02]'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300',
               )}
             >
               Files
@@ -609,7 +714,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
                 'flex-1 text-center py-2 font-semibold uppercase tracking-wider cursor-pointer border-b transition',
                 activeTab === 'blocks'
                   ? 'border-[var(--brass)] text-[var(--brass)] bg-white/[0.02]'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300',
               )}
             >
               Blocks
@@ -617,11 +722,7 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
           </div>
 
           <div className="min-h-0 flex-1 overflow-hidden">
-            {activeTab === 'files' ? (
-              <FileTree workspaceId={workspaceId} />
-            ) : (
-              <BlocksPalette />
-            )}
+            {activeTab === 'files' ? <FileTree workspaceId={workspaceId} /> : <BlocksPalette />}
           </div>
         </aside>
 
@@ -648,7 +749,9 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
                 <Toad className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <h3 className="font-cinzel text-sm font-bold text-zinc-100 tracking-wider">Ronald&apos;s review</h3>
+                <h3 className="font-cinzel text-sm font-bold text-zinc-100 tracking-wider">
+                  Ronald&apos;s review
+                </h3>
                 <p className="text-[10px] text-zinc-500">A quick check before you ship.</p>
               </div>
               {verdict && (
@@ -687,7 +790,12 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
             {deployState === 'success' && deployUrl && (
               <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2.5 text-xs text-emerald-300 flex items-center gap-2">
                 <span className="font-semibold text-emerald-400">Deployed.</span>
-                <a href={deployUrl} target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-white">
+                <a
+                  href={deployUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold underline hover:text-white"
+                >
                   Open app
                 </a>
               </div>
@@ -695,7 +803,8 @@ export function IdeShell({ workspaceId }: { workspaceId: string }) {
 
             {deployState === 'simulated' && (
               <p className="text-[11px] text-sky-300/90 leading-relaxed rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2.5">
-                {deployLogs || 'This workspace runs on the mock sandbox, so no real deployment was performed. Connect a real sandbox to build and host it.'}
+                {deployLogs ||
+                  'This workspace runs on the mock sandbox, so no real deployment was performed. Connect a real sandbox to build and host it.'}
               </p>
             )}
 
@@ -768,7 +877,7 @@ function RonaldVerdictView({ verdict }: { verdict: ReviewVerdict }) {
                 {style.label}
               </span>
               <span className="text-zinc-300 font-medium">{check.name}</span>
-              <span className="text-zinc-550 text-[11px] truncate">{check.detail}</span>
+              <span className="text-zinc-500 text-[11px] truncate">{check.detail}</span>
             </div>
           )
         })}
@@ -776,7 +885,9 @@ function RonaldVerdictView({ verdict }: { verdict: ReviewVerdict }) {
 
       {verdict.blockers.length > 0 && (
         <div className="rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2.5 space-y-1.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">What is missing</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">
+            What is missing
+          </p>
           <ul className="list-disc pl-4 space-y-1 text-[12px] text-zinc-300">
             {verdict.blockers.map((b, i) => (
               <li key={i}>{b}</li>
@@ -787,7 +898,9 @@ function RonaldVerdictView({ verdict }: { verdict: ReviewVerdict }) {
 
       {verdict.recommendations.length > 0 && (
         <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 space-y-1.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-450">Worth doing</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+            Worth doing
+          </p>
           <ul className="list-disc pl-4 space-y-1 text-[12px] text-zinc-400">
             {verdict.recommendations.map((r, i) => (
               <li key={i}>{r}</li>

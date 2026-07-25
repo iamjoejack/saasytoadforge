@@ -55,7 +55,7 @@ export function EditorPane() {
   const [browserUrl, setBrowserUrl] = useState('http://localhost:3000')
   const [inputUrl, setInputUrl] = useState('http://localhost:3000')
   const [iframeKey, setIframeKey] = useState(0)
-  
+
   // Inspect Mode State
   const [inspectMode, setInspectMode] = useState(false)
 
@@ -167,7 +167,9 @@ export function EditorPane() {
                   }}
                   className="flex items-center gap-1.5 cursor-pointer font-medium"
                 >
-                  {dirty[path] ? <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]" /> : null}
+                  {dirty[path] ? (
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--brass)]" />
+                  ) : null}
                   {name}
                 </button>
                 <button
@@ -192,7 +194,7 @@ export function EditorPane() {
               'px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider transition cursor-pointer flex items-center gap-1',
               viewMode === 'editor'
                 ? 'bg-zinc-800 text-[var(--brass)] border border-[var(--brass)]/30'
-                : 'text-zinc-500 hover:text-zinc-350'
+                : 'text-zinc-500 hover:text-zinc-350',
             )}
           >
             Code
@@ -204,7 +206,7 @@ export function EditorPane() {
               'px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider transition cursor-pointer flex items-center gap-1',
               viewMode === 'browser'
                 ? 'bg-zinc-800 text-[var(--brass)] border border-[var(--brass)]/30'
-                : 'text-zinc-500 hover:text-zinc-350'
+                : 'text-zinc-500 hover:text-zinc-350',
             )}
           >
             Live preview
@@ -215,7 +217,7 @@ export function EditorPane() {
       <div className="min-h-0 flex-1 relative">
         {viewMode === 'editor' ? (
           openTabs.length === 0 || !activePath ? (
-            <div className="flex h-full items-center justify-center bg-[#0d0d0f] text-sm text-zinc-650">
+            <div className="flex h-full items-center justify-center bg-[#0d0d0f] text-sm text-zinc-600">
               Select a file to start editing.
             </div>
           ) : (
@@ -277,7 +279,7 @@ export function EditorPane() {
                   type="text"
                   value={inputUrl}
                   onChange={(e) => setInputUrl(e.target.value)}
-                  className="w-full rounded bg-black/40 border border-white/10 px-3 py-1 text-xs font-mono text-zinc-300 placeholder:text-zinc-650 focus:border-[var(--brass)]/50 focus:outline-none"
+                  className="w-full rounded bg-black/40 border border-white/10 px-3 py-1 text-xs font-mono text-zinc-300 placeholder:text-zinc-600 focus:border-[var(--brass)]/50 focus:outline-none"
                   placeholder="Enter URL (e.g. http://localhost:3000)"
                 />
               </form>
@@ -291,7 +293,7 @@ export function EditorPane() {
                     'px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition cursor-pointer flex items-center gap-1 border',
                     inspectMode
                       ? 'bg-[var(--brass)]/20 text-[var(--brass)] border-[var(--brass)]/50 animate-pulse'
-                      : 'text-zinc-400 border-white/10 hover:text-zinc-200'
+                      : 'text-zinc-400 border-white/10 hover:text-zinc-200',
                   )}
                   title="Inspect visual component (click component to go to code)"
                 >
@@ -310,26 +312,28 @@ export function EditorPane() {
               {browserUrl.includes('localhost') && workspaceId?.startsWith('mock_') ? (
                 <div className="flex h-full flex-col items-center justify-center p-8 text-center bg-[#0e0e12] overflow-auto select-none">
                   <div className="circuit-grid opacity-20" />
-                  
+
                   <div className="relative z-10 max-w-md p-6 rounded-xl border border-[var(--brass)]/25 bg-black/40 space-y-4 shadow-xl">
                     <div className="flex justify-center">
                       <div
                         onClick={() => handleSimulatedInspect('src/components/Toad.tsx', 2)}
                         className={cn(
                           'h-12 w-12 rounded-full bg-[var(--brass)]/10 border border-[var(--brass)]/30 flex items-center justify-center text-2xl animate-bounce transition-all',
-                          inspectMode && 'border-dashed border-[var(--brass)] bg-[var(--brass)]/20 hover:scale-110 cursor-crosshair'
+                          inspectMode &&
+                            'border-dashed border-[var(--brass)] bg-[var(--brass)]/20 hover:scale-110 cursor-crosshair',
                         )}
                         title={inspectMode ? 'Inspect src/components/Toad.tsx' : undefined}
                       >
                         <Toad className="h-7 w-7" />
                       </div>
                     </div>
-                    
+
                     <div
                       onClick={() => handleSimulatedInspect('src/App.tsx', 15)}
                       className={cn(
                         'space-y-1 p-2 rounded transition-all',
-                        inspectMode && 'border border-dashed border-[var(--brass)] bg-[var(--brass)]/5 hover:bg-[var(--brass)]/10 cursor-crosshair'
+                        inspectMode &&
+                          'border border-dashed border-[var(--brass)] bg-[var(--brass)]/5 hover:bg-[var(--brass)]/10 cursor-crosshair',
                       )}
                       title={inspectMode ? 'Inspect src/App.tsx' : undefined}
                     >
@@ -342,9 +346,9 @@ export function EditorPane() {
                     </div>
 
                     <p className="text-xs text-zinc-400 leading-relaxed">
-                      Forge is executing your repository environment inside an isolated sandbox VM. 
-                      Since this is a simulated sandbox, the server output is mocked below. 
-                      To run a live web server on actual hardware VMs, connect to a production E2B template.
+                      Forge is executing your repository environment inside an isolated sandbox VM.
+                      Since this is a simulated sandbox, the server output is mocked below. To run a
+                      live web server on actual hardware VMs, connect to a production E2B template.
                     </p>
 
                     <div className="border-t border-white/5 pt-3 text-left space-y-2">
@@ -355,13 +359,20 @@ export function EditorPane() {
                         onClick={() => handleSimulatedInspect('src/components/Console.tsx', 5)}
                         className={cn(
                           'rounded bg-black/80 p-2.5 font-mono text-[10px] text-emerald-400 space-y-1.5 border border-white/5 transition-all',
-                          inspectMode && 'border-dashed border-[var(--brass)] bg-emerald-500/10 hover:brightness-110 cursor-crosshair'
+                          inspectMode &&
+                            'border-dashed border-[var(--brass)] bg-emerald-500/10 hover:brightness-110 cursor-crosshair',
                         )}
                         title={inspectMode ? 'Inspect src/components/Console.tsx' : undefined}
                       >
-                        <p className="text-zinc-500">[{new Date().toLocaleTimeString()}] Starting bundler...</p>
-                        <p className="text-zinc-500">[{new Date().toLocaleTimeString()}] Loaded environment configs</p>
-                        <p className="text-emerald-500">✓ Ready in 450ms. Local: http://localhost:3000</p>
+                        <p className="text-zinc-500">
+                          [{new Date().toLocaleTimeString()}] Starting bundler...
+                        </p>
+                        <p className="text-zinc-500">
+                          [{new Date().toLocaleTimeString()}] Loaded environment configs
+                        </p>
+                        <p className="text-emerald-500">
+                          ✓ Ready in 450ms. Local: http://localhost:3000
+                        </p>
                         <p className="text-emerald-400">✓ Supabase database connection verified.</p>
                       </div>
                     </div>
@@ -369,10 +380,14 @@ export function EditorPane() {
                     <div className="text-[10px] text-zinc-500">
                       {inspectMode ? (
                         <span className="text-[var(--brass)] font-bold animate-pulse">
-                          Inspect mode active: click any highlighted container or element to locate its code file.
+                          Inspect mode active: click any highlighted container or element to locate
+                          its code file.
                         </span>
                       ) : (
-                        <span>Press <strong>↻</strong> reload above to restart the simulated process loop.</span>
+                        <span>
+                          Press <strong>↻</strong> reload above to restart the simulated process
+                          loop.
+                        </span>
                       )}
                     </div>
                   </div>

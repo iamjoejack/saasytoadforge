@@ -28,11 +28,14 @@ function signingKey(): string {
   const explicit = process.env.ADMIN_SESSION_SECRET
   if (explicit) return explicit
   const agentSecret = process.env.AGENT_SERVICE_SECRET
-  if (agentSecret) return crypto.createHash('sha256').update(`forge-admin-session:${agentSecret}`).digest('hex')
+  if (agentSecret)
+    return crypto.createHash('sha256').update(`forge-admin-session:${agentSecret}`).digest('hex')
   const svc = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (svc) return crypto.createHash('sha256').update(`forge-admin-session:${svc}`).digest('hex')
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('ADMIN_SESSION_SECRET must be set in production; refusing to sign admin sessions with a public key.')
+    throw new Error(
+      'ADMIN_SESSION_SECRET must be set in production; refusing to sign admin sessions with a public key.',
+    )
   }
   return DEV_KEY
 }
@@ -76,5 +79,10 @@ export function verifyAdminSession(token: string | undefined | null): AdminClaim
   ) {
     return null
   }
-  return { email: claims.email, role: claims.role, permissions: sanitizeAreas(claims.permissions), exp: claims.exp }
+  return {
+    email: claims.email,
+    role: claims.role,
+    permissions: sanitizeAreas(claims.permissions),
+    exp: claims.exp,
+  }
 }

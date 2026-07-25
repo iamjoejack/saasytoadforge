@@ -46,7 +46,8 @@ function TreeNode({
   // Reload child folders reactively on global file edits/creations/deletions
   useEffect(() => {
     if (open) {
-      client.listFiles(workspaceId, entry.path)
+      client
+        .listFiles(workspaceId, entry.path)
         .then(setChildren)
         .catch(() => {})
     }
@@ -86,10 +87,13 @@ function TreeNode({
           <FileIcon type={entry.type} open={open} />
           <span className="truncate">{entry.name}</span>
           {entry.type === 'file' && dirty[entry.path] ? (
-            <span className="ml-2 h-1.5 w-1.5 rounded-full bg-[var(--brass)]" aria-label="unsaved" />
+            <span
+              className="ml-2 h-1.5 w-1.5 rounded-full bg-[var(--brass)]"
+              aria-label="unsaved"
+            />
           ) : null}
         </button>
-        
+
         <button
           type="button"
           onClick={handleDelete}
@@ -114,7 +118,7 @@ export function FileTree({ workspaceId }: { workspaceId: string }) {
   const [root, setRoot] = useState<FileEntry[] | null>(null)
   const [error, setError] = useState(false)
   const fileVersion = useAgent((s) => s.fileVersion)
-  
+
   // File addition fields
   const [showInput, setShowInput] = useState(false)
   const [inputType, setInputType] = useState<'file' | 'folder'>('file')
@@ -152,7 +156,7 @@ export function FileTree({ workspaceId }: { workspaceId: string }) {
     e.preventDefault()
     const path = newItemName.trim()
     if (!path) return
-    
+
     try {
       if (inputType === 'file') {
         await client.writeFile(workspaceId, path, '')
@@ -200,7 +204,10 @@ export function FileTree({ workspaceId }: { workspaceId: string }) {
 
       {/* Creation form */}
       {showInput && (
-        <form onSubmit={handleSubmit} className="px-3 py-1.5 border-b border-white/5 flex gap-1 bg-black/30">
+        <form
+          onSubmit={handleSubmit}
+          className="px-3 py-1.5 border-b border-white/5 flex gap-1 bg-black/30"
+        >
           <input
             ref={inputRef}
             type="text"
@@ -209,8 +216,19 @@ export function FileTree({ workspaceId }: { workspaceId: string }) {
             onChange={(e) => setNewItemName(e.target.value)}
             className="flex-1 rounded bg-black border border-white/10 px-2 py-0.5 text-xs text-zinc-300 focus:border-[var(--brass)]/50 focus:outline-none"
           />
-          <button type="submit" className="text-xs text-[var(--brass)] px-1 hover:underline cursor-pointer font-medium">Create</button>
-          <button type="button" onClick={() => setShowInput(false)} className="text-xs text-zinc-500 px-1 hover:underline cursor-pointer">Cancel</button>
+          <button
+            type="submit"
+            className="text-xs text-[var(--brass)] px-1 hover:underline cursor-pointer font-medium"
+          >
+            Create
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowInput(false)}
+            className="text-xs text-zinc-500 px-1 hover:underline cursor-pointer"
+          >
+            Cancel
+          </button>
         </form>
       )}
 

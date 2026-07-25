@@ -32,9 +32,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
   }
   try {
-    const record = await getAdminStore().createAdmin(email, password, sanitizeAreas(body.permissions))
+    const record = await getAdminStore().createAdmin(
+      email,
+      password,
+      sanitizeAreas(body.permissions),
+    )
     return NextResponse.json({ admin: record })
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Could not create admin.' }, { status: 400 })
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Could not create admin.' },
+      { status: 400 },
+    )
   }
 }

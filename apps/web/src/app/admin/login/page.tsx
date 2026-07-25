@@ -24,7 +24,11 @@ export default function AdminLoginPage() {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password, setupSecret: setupSecret || undefined }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          setupSecret: setupSecret || undefined,
+        }),
       })
       const body = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) {
@@ -48,7 +52,9 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-sm glass-panel p-8 rounded-2xl shadow-2xl relative z-10 animate-slide-up">
         <div className="mb-7 flex flex-col items-center text-center">
           <Logo wordmark="Forge" markSize={34} showWordmark={false} />
-          <h1 className="mt-4 text-xl font-bold tracking-tight text-white font-cinzel">Owner and admin sign in</h1>
+          <h1 className="mt-4 text-xl font-bold tracking-tight text-white font-cinzel">
+            Owner and admin sign in
+          </h1>
           <p className="mt-1.5 text-[11px] text-zinc-500 leading-relaxed">
             This is the back office. Customers sign in from the main app, not here.
           </p>
@@ -65,7 +71,9 @@ export default function AdminLoginPage() {
 
         <form onSubmit={submit} className="space-y-3.5">
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Email</label>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">
+              Email
+            </label>
             <input
               type="email"
               required
@@ -79,7 +87,9 @@ export default function AdminLoginPage() {
             />
           </div>
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Password</label>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">
+              Password
+            </label>
             <input
               type="password"
               required
@@ -96,7 +106,10 @@ export default function AdminLoginPage() {
           {looksLikeOwner && (
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">
-                Setup code <span className="text-zinc-600 normal-case font-normal">(first-time owner only, if your company set one)</span>
+                Setup code{' '}
+                <span className="text-zinc-600 normal-case font-normal">
+                  (first-time owner only, if your company set one)
+                </span>
               </label>
               <input
                 type="password"

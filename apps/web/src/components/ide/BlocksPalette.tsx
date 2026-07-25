@@ -15,7 +15,8 @@ const BLOCKS: BlockItem[] = [
     id: 'hero',
     name: 'Steampunk Hero Panel',
     category: 'Containers',
-    description: 'A headline banner with a serif Cinzel title, glowing copper text, and gear accent line.',
+    description:
+      'A headline banner with a serif Cinzel title, glowing copper text, and gear accent line.',
     snippet: `{/* Steampunk Hero Panel */}
 <div className="relative overflow-hidden rounded-2xl border border-[var(--brass)]/20 bg-black/40 p-8 text-center shadow-xl">
   <div className="circuit-grid opacity-10" />
@@ -54,7 +55,8 @@ const BLOCKS: BlockItem[] = [
     id: 'brass-btn',
     name: 'Metallic Brass Button',
     category: 'Inputs',
-    description: 'An interactive button styled with radial golden sheen and active-click scale reactions.',
+    description:
+      'An interactive button styled with radial golden sheen and active-click scale reactions.',
     snippet: `{/* Metallic Brass Button */}
 <button 
   type="button" 

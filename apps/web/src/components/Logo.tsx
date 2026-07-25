@@ -36,7 +36,9 @@ export function Logo({
         draggable={false}
       />
       {showWordmark && (
-        <span className="font-cinzel text-sm font-semibold tracking-tight text-white">{wordmark}</span>
+        <span className="font-cinzel text-sm font-semibold tracking-tight text-white">
+          {wordmark}
+        </span>
       )}
     </span>
   )

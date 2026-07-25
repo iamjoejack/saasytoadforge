@@ -39,7 +39,12 @@ describe('permissions', () => {
 })
 
 describe('admin session token', () => {
-  const claims = { email: 'owner@forge.dev', role: 'owner' as const, permissions: [...ALL_AREAS], exp: Date.now() + 10000 }
+  const claims = {
+    email: 'owner@forge.dev',
+    role: 'owner' as const,
+    permissions: [...ALL_AREAS],
+    exp: Date.now() + 10000,
+  }
 
   it('round-trips a valid session', () => {
     const verified = verifyAdminSession(signAdminSession(claims))

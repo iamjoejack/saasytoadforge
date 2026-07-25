@@ -3,7 +3,14 @@ import type { AgentEvent, AgentCommand, AgentRole, PlanStep, TerminalResult } fr
 import * as client from './forge-client'
 
 export type TimelineItem =
-  | { id: string; kind: 'message'; role: 'user' | 'assistant'; text: string; agent?: AgentRole; ts: number }
+  | {
+      id: string
+      kind: 'message'
+      role: 'user' | 'assistant'
+      text: string
+      agent?: AgentRole
+      ts: number
+    }
   | { id: string; kind: 'plan'; steps: PlanStep[]; ts: number }
   | {
       id: string
@@ -103,8 +110,10 @@ export const useAgent = create<AgentStore>()((set, get) => ({
   running: false,
   requireWriteApproval: false,
   modelTier: readStoredTier(),
-  customModelId: typeof window !== 'undefined' ? (localStorage.getItem('forge:custom_model_id') || '') : '',
-  interviewEnabled: typeof window !== 'undefined' ? localStorage.getItem('forge:interview') !== 'false' : true,
+  customModelId:
+    typeof window !== 'undefined' ? localStorage.getItem('forge:custom_model_id') || '' : '',
+  interviewEnabled:
+    typeof window !== 'undefined' ? localStorage.getItem('forge:interview') !== 'false' : true,
   spendUsd: null,
   fileVersion: 0,
   timeline: [],
@@ -131,7 +140,9 @@ export const useAgent = create<AgentStore>()((set, get) => ({
                 socket.send(JSON.stringify({ type: 'spend_topup_mode', enabled: true }))
               }
             }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
         socket.onclose = () => set({ connected: false, running: false })
         socket.onerror = () => set({ connected: false })
@@ -221,7 +232,10 @@ export const useAgent = create<AgentStore>()((set, get) => ({
 
     set((s) => ({
       running: true,
-      timeline: [...s.timeline, { id: nextId(), kind: 'message', role: 'user', text: task, ts: now() }],
+      timeline: [
+        ...s.timeline,
+        { id: nextId(), kind: 'message', role: 'user', text: task, ts: now() },
+      ],
     }))
     send(socket, {
       type: 'task',
@@ -313,12 +327,21 @@ function applyEvent(set: SetState, event: AgentEvent) {
       set((s) => ({
         timeline: [
           ...s.timeline,
-          { id: nextId(), kind: 'message', role: 'assistant', text: event.text, agent: event.agent, ts: now() },
+          {
+            id: nextId(),
+            kind: 'message',
+            role: 'assistant',
+            text: event.text,
+            agent: event.agent,
+            ts: now(),
+          },
         ],
       }))
       break
     case 'plan':
-      set((s) => ({ timeline: [...s.timeline, { id: nextId(), kind: 'plan', steps: event.steps, ts: now() }] }))
+      set((s) => ({
+        timeline: [...s.timeline, { id: nextId(), kind: 'plan', steps: event.steps, ts: now() }],
+      }))
       break
     case 'step':
       set((s) => ({
@@ -364,7 +387,14 @@ function applyEvent(set: SetState, event: AgentEvent) {
       set((s) => ({
         timeline: [
           ...s.timeline,
-          { id: nextId(), kind: 'screenshot', label: event.label, image: event.image, agent: event.agent, ts: now() },
+          {
+            id: nextId(),
+            kind: 'screenshot',
+            label: event.label,
+            image: event.image,
+            agent: event.agent,
+            ts: now(),
+          },
         ],
       }))
       break
@@ -422,7 +452,9 @@ function applyEvent(set: SetState, event: AgentEvent) {
       }))
       break
     case 'error':
-      set((s) => ({ timeline: [...s.timeline, { id: nextId(), kind: 'error', text: event.message, ts: now() }] }))
+      set((s) => ({
+        timeline: [...s.timeline, { id: nextId(), kind: 'error', text: event.message, ts: now() }],
+      }))
       if (typeof window !== 'undefined' && localStorage.getItem('forge:notifications') === 'true') {
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('Forge Agent Task Error', {
@@ -436,7 +468,9 @@ function applyEvent(set: SetState, event: AgentEvent) {
       if (typeof window !== 'undefined' && localStorage.getItem('forge:notifications') === 'true') {
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('Forge Agent Task Complete', {
-            body: event.ok ? 'The task has completed successfully!' : 'The task has completed, but encountered issues.',
+            body: event.ok
+              ? 'The task has completed successfully!'
+              : 'The task has completed, but encountered issues.',
           })
         }
       }
