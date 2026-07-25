@@ -95,11 +95,35 @@ export class MockPlanner implements Planner {
             { id: 's4', title: 'Capture a screenshot', role: 'browser' },
           ],
         },
-        { kind: 'edit', stepId: 's1', agent: 'coder', path: 'public/index.html', contents: GREETING_HTML },
-        { kind: 'edit', stepId: 's2', agent: 'coder', path: 'src/greet.mjs', contents: GREET_MODULE },
-        { kind: 'edit', stepId: 's3', agent: 'verifier', path: 'test/greet.test.mjs', contents: GREET_TEST },
+        {
+          kind: 'edit',
+          stepId: 's1',
+          agent: 'coder',
+          path: 'public/index.html',
+          contents: GREETING_HTML,
+        },
+        {
+          kind: 'edit',
+          stepId: 's2',
+          agent: 'coder',
+          path: 'src/greet.mjs',
+          contents: GREET_MODULE,
+        },
+        {
+          kind: 'edit',
+          stepId: 's3',
+          agent: 'verifier',
+          path: 'test/greet.test.mjs',
+          contents: GREET_TEST,
+        },
         { kind: 'run', stepId: 's3', agent: 'verifier', cmd: 'node --test test/greet.test.mjs' },
-        { kind: 'screenshot', stepId: 's4', agent: 'browser', path: 'public/index.html', label: 'Greeting page' },
+        {
+          kind: 'screenshot',
+          stepId: 's4',
+          agent: 'browser',
+          path: 'public/index.html',
+          label: 'Greeting page',
+        },
       ]
     }
 
@@ -118,8 +142,20 @@ export class MockPlanner implements Planner {
             { id: 's3', title: 'Run the test', role: 'verifier' },
           ],
         },
-        { kind: 'edit', stepId: 's1', agent: 'coder', path: 'src/time.mjs', contents: TIME_ENDPOINT },
-        { kind: 'edit', stepId: 's2', agent: 'verifier', path: 'test/time.test.mjs', contents: TIME_TEST },
+        {
+          kind: 'edit',
+          stepId: 's1',
+          agent: 'coder',
+          path: 'src/time.mjs',
+          contents: TIME_ENDPOINT,
+        },
+        {
+          kind: 'edit',
+          stepId: 's2',
+          agent: 'verifier',
+          path: 'test/time.test.mjs',
+          contents: TIME_TEST,
+        },
         { kind: 'run', stepId: 's3', agent: 'verifier', cmd: 'node --test test/time.test.mjs' },
       ]
     }

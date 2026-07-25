@@ -80,15 +80,18 @@ export class Agent {
       const parts = opts.task.split(' ')
       const timePart = parts[1] ?? '5s'
       const command = parts.slice(2).join(' ') || 'echo "Timer fired"'
-      
+
       let seconds = 5
       if (timePart.endsWith('s')) {
         seconds = parseInt(timePart.slice(0, -1)) || 5
       } else if (timePart.endsWith('m')) {
         seconds = (parseInt(timePart.slice(0, -1)) || 1) * 60
       }
-      
-      emit({ type: 'message', text: `Scheduled background task "${command}" to run in ${seconds} seconds.` })
+
+      emit({
+        type: 'message',
+        text: `Scheduled background task "${command}" to run in ${seconds} seconds.`,
+      })
 
       setTimeout(() => {
         emit({ type: 'message', text: `Timer fired: running "${command}" in the sandbox.` })
@@ -106,10 +109,13 @@ export class Agent {
             })
           })
           .catch((err) => {
-            emit({ type: 'error', message: `Scheduled task failed: ${err instanceof Error ? err.message : String(err)}` })
+            emit({
+              type: 'error',
+              message: `Scheduled task failed: ${err instanceof Error ? err.message : String(err)}`,
+            })
           })
       }, seconds * 1000)
-      
+
       emit({ type: 'done', ok: true })
       return { ok: true }
     }
@@ -120,7 +126,12 @@ export class Agent {
         type: 'question',
         id: 'grill:preset',
         question: 'Which visual style preset do you prefer for this website?',
-        options: ['Steampunk Industrial (Recommended)', 'Cyberpunk Glow', 'Glassmorphic Minimal', 'Retro Terminal'],
+        options: [
+          'Steampunk Industrial (Recommended)',
+          'Cyberpunk Glow',
+          'Glassmorphic Minimal',
+          'Retro Terminal',
+        ],
         isMultiSelect: false,
       })
       const styleAnswer = await opts.questions.request('grill:preset')
@@ -130,7 +141,12 @@ export class Agent {
         type: 'question',
         id: 'grill:extensions',
         question: 'Select the extensions you would like to pre-install in this project:',
-        options: ['Supabase DB Client', 'Resend Mail SDK', 'Upstash Redis Caching', 'Vitest Testing Suite'],
+        options: [
+          'Supabase DB Client',
+          'Resend Mail SDK',
+          'Upstash Redis Caching',
+          'Vitest Testing Suite',
+        ],
         isMultiSelect: true,
       })
       const extAnswer = await opts.questions.request('grill:extensions')

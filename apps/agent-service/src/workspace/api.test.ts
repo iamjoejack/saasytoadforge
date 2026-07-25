@@ -25,7 +25,11 @@ describe('workspace REST API', () => {
     const id = await createWorkspace(server)
     expect(id).toMatch(/^mock_/)
 
-    const files = await server.inject({ method: 'GET', url: `/workspaces/${id}/files`, headers: ALICE })
+    const files = await server.inject({
+      method: 'GET',
+      url: `/workspaces/${id}/files`,
+      headers: ALICE,
+    })
     const names = files.json<Array<{ name: string }>>().map((f) => f.name)
     expect(names).toEqual(expect.arrayContaining(['README.md', 'index.js', 'src']))
     await server.close()
@@ -106,14 +110,22 @@ describe('workspace REST API', () => {
     const id = await createWorkspace(server)
     const del = await server.inject({ method: 'DELETE', url: `/workspaces/${id}`, headers: ALICE })
     expect(del.statusCode).toBe(200)
-    const after = await server.inject({ method: 'GET', url: `/workspaces/${id}/files`, headers: ALICE })
+    const after = await server.inject({
+      method: 'GET',
+      url: `/workspaces/${id}/files`,
+      headers: ALICE,
+    })
     expect(after.statusCode).toBe(404)
     await server.close()
   })
 
   it('404s for an unknown workspace', async () => {
     const server = app()
-    const res = await server.inject({ method: 'GET', url: '/workspaces/nope/files', headers: ALICE })
+    const res = await server.inject({
+      method: 'GET',
+      url: '/workspaces/nope/files',
+      headers: ALICE,
+    })
     expect(res.statusCode).toBe(404)
     await server.close()
   })

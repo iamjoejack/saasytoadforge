@@ -231,11 +231,18 @@ function routes(
         return reply.code(400).send({ error: 'invalid signature' })
       }
       if (fulfillment?.customerEmail && fulfillment.creditUsd > 0) {
-        ledger.addEmailCredits(fulfillment.customerEmail, fulfillment.creditUsd)
-        logger.info('stripe top-up fulfilled', {
+        // Keyed on the Stripe event id: a redelivery of an already-fulfilled event must not
+        // grant the credit a second time. Still answer 200 so Stripe stops retrying.
+        const granted = ledger.addEmailCredits(
+          fulfillment.customerEmail,
+          fulfillment.creditUsd,
+          fulfillment.eventId,
+        )
+        logger.info(granted ? 'stripe top-up fulfilled' : 'stripe top-up already fulfilled', {
           email: fulfillment.customerEmail,
           creditUsd: fulfillment.creditUsd,
           plan: fulfillment.planId,
+          eventId: fulfillment.eventId,
         })
       }
       return reply.code(200).send({ received: true })

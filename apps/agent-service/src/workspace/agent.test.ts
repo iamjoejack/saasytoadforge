@@ -12,12 +12,15 @@ const AUTH = { authorization: `Bearer ${TOKEN}` }
 
 describe('agent websocket', () => {
   it('runs the canonical task and streams plan, edits, terminal, done', async () => {
-    const server = buildServer({ provider: new MockSandboxProvider(), browser: new MockBrowserTool() })
+    const server = buildServer({
+      provider: new MockSandboxProvider(),
+      browser: new MockBrowserTool(),
+    })
     await server.listen({ port: 0, host: '127.0.0.1' })
     const { port } = server.server.address() as AddressInfo
-    const id = (
-      await server.inject({ method: 'POST', url: '/workspaces', headers: AUTH })
-    ).json<{ id: string }>().id
+    const id = (await server.inject({ method: 'POST', url: '/workspaces', headers: AUTH })).json<{
+      id: string
+    }>().id
 
     const socket = new WebSocket(`ws://127.0.0.1:${port}/workspaces/${id}/agent?token=${TOKEN}`)
     const events: AgentEvent[] = []
@@ -59,7 +62,8 @@ describe('agent websocket', () => {
         url: `/workspaces/${id}/sessions`,
         headers: AUTH,
       })
-      const sessions = sessionsRes.json<Array<{ task: string; artifacts: Array<{ type: string }> }>>()
+      const sessions =
+        sessionsRes.json<Array<{ task: string; artifacts: Array<{ type: string }> }>>()
       expect(sessions).toHaveLength(1)
       const kinds = sessions[0]?.artifacts.map((a) => a.type) ?? []
       expect(kinds).toContain('edit')
@@ -71,12 +75,15 @@ describe('agent websocket', () => {
   })
 
   it('closes the agent socket (1008) for missing, garbage, or non-owner tokens', async () => {
-    const server = buildServer({ provider: new MockSandboxProvider(), browser: new MockBrowserTool() })
+    const server = buildServer({
+      provider: new MockSandboxProvider(),
+      browser: new MockBrowserTool(),
+    })
     await server.listen({ port: 0, host: '127.0.0.1' })
     const { port } = server.server.address() as AddressInfo
-    const id = (
-      await server.inject({ method: 'POST', url: '/workspaces', headers: AUTH })
-    ).json<{ id: string }>().id
+    const id = (await server.inject({ method: 'POST', url: '/workspaces', headers: AUTH })).json<{
+      id: string
+    }>().id
     const bobToken = mintAgentToken('bob', DEFAULT_AGENT_SERVICE_SECRET)
 
     const closeCode = (url: string) =>
@@ -110,16 +117,18 @@ describe('agent websocket', () => {
     })
     await server.listen({ port: 0, host: '127.0.0.1' })
     const { port } = server.server.address() as AddressInfo
-    const id = (
-      await server.inject({ method: 'POST', url: '/workspaces', headers: AUTH })
-    ).json<{ id: string }>().id
+    const id = (await server.inject({ method: 'POST', url: '/workspaces', headers: AUTH })).json<{
+      id: string
+    }>().id
 
     const socket = new WebSocket(`ws://127.0.0.1:${port}/workspaces/${id}/agent?token=${TOKEN}`)
     const events: AgentEvent[] = []
     try {
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('timeout')), 4000)
-        socket.on('open', () => socket.send(JSON.stringify({ type: 'task', task: 'time endpoint' })))
+        socket.on('open', () =>
+          socket.send(JSON.stringify({ type: 'task', task: 'time endpoint' })),
+        )
         socket.on('message', (data: Buffer) => {
           const e = JSON.parse(data.toString()) as AgentEvent
           events.push(e)

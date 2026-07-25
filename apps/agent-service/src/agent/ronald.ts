@@ -92,7 +92,11 @@ async function runScriptChecks(
     try {
       res = await provider.exec(sandboxId, `npm run ${step.key} --silent`)
     } catch (err) {
-      checks.push({ name: step.name, status: 'skip', detail: err instanceof Error ? err.message : 'could not run' })
+      checks.push({
+        name: step.name,
+        status: 'skip',
+        detail: err instanceof Error ? err.message : 'could not run',
+      })
       continue
     }
 
@@ -123,15 +127,27 @@ async function staticChecks(
 
   const testFiles = files.filter((f) => TEST_RE.test(f) || f.includes('/__tests__/'))
   if (testFiles.length === 0) {
-    checks.push({ name: 'Test coverage', status: 'warn', detail: 'No test files found in the workspace.' })
+    checks.push({
+      name: 'Test coverage',
+      status: 'warn',
+      detail: 'No test files found in the workspace.',
+    })
     recommendations.push('Add at least one smoke test.')
   } else {
-    checks.push({ name: 'Test coverage', status: 'pass', detail: `${testFiles.length} test file(s) present.` })
+    checks.push({
+      name: 'Test coverage',
+      status: 'pass',
+      detail: `${testFiles.length} test file(s) present.`,
+    })
   }
 
   const committedEnv = files.filter((f) => /(^|\/)\.env(\.local|\.production)?$/.test(f))
   if (committedEnv.length > 0) {
-    checks.push({ name: 'Secrets', status: 'warn', detail: `Found ${committedEnv.join(', ')} in the workspace.` })
+    checks.push({
+      name: 'Secrets',
+      status: 'warn',
+      detail: `Found ${committedEnv.join(', ')} in the workspace.`,
+    })
     recommendations.push('Keep real secrets out of committed files; use environment variables.')
   } else {
     checks.push({ name: 'Secrets', status: 'pass', detail: 'No committed .env files detected.' })
@@ -151,7 +167,11 @@ async function staticChecks(
     if (found) markers += found.length
   }
   if (markers > 0) {
-    checks.push({ name: 'Leftover markers', status: 'warn', detail: `${markers} TODO/FIXME-style marker(s) in source.` })
+    checks.push({
+      name: 'Leftover markers',
+      status: 'warn',
+      detail: `${markers} TODO/FIXME-style marker(s) in source.`,
+    })
     recommendations.push('Resolve or remove leftover TODO/FIXME markers before launch.')
   }
 
@@ -173,9 +193,7 @@ async function llmReview(
   llm: LlmClient,
   model: string,
 ): Promise<LlmReviewResult | null> {
-  const files = (await walkFiles(provider, sandboxId))
-    .filter((f) => SOURCE_RE.test(f))
-    .slice(0, 6)
+  const files = (await walkFiles(provider, sandboxId)).filter((f) => SOURCE_RE.test(f)).slice(0, 6)
   if (files.length === 0) return null
 
   const snippets: string[] = []
@@ -266,8 +284,14 @@ export async function reviewWorkspace(
       detail: `Found package.json${pkg.name ? ` for ${pkg.name}` : ''}.`,
     })
   } else {
-    checks.push({ name: 'Project manifest', status: 'warn', detail: 'No package.json at the workspace root.' })
-    recommendations.push('Add a package.json with build and test scripts so deploys can be verified.')
+    checks.push({
+      name: 'Project manifest',
+      status: 'warn',
+      detail: 'No package.json at the workspace root.',
+    })
+    recommendations.push(
+      'Add a package.json with build and test scripts so deploys can be verified.',
+    )
   }
 
   await runScriptChecks(provider, sandboxId, pkg?.scripts ?? {}, checks, blockers, recommendations)
