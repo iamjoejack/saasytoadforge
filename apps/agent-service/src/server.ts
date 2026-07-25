@@ -60,6 +60,46 @@ const WS_ROUTE = /\/workspaces\/[^/]+\/(shell|agent)$/
 const FRONTIER_EST_TOKENS = 2300
 const DEEP_EST_TOKENS = 9000
 
+/** Port the deployed app is expected to serve on, and the host E2B maps to a public URL. */
+const APP_PORT = 3000
+/** How long to wait for the started app to answer before calling the deploy not-live. */
+const SERVE_PROBE_SECONDS = 25
+
+/**
+ * Start the built app and wait for it to actually answer on APP_PORT.
+ *
+ * A successful build says nothing about whether a server is listening, so this is what
+ * separates "deployed" from "compiled". Already-running is fine: the probe short-circuits
+ * and no second process is started.
+ */
+async function serveWorkspace(
+  provider: SandboxProvider,
+  sandboxId: string,
+): Promise<{ ok: boolean; logs: string }> {
+  const probe =
+    `for i in $(seq 1 ${SERVE_PROBE_SECONDS}); do ` +
+    `curl -sf -o /dev/null http://localhost:${APP_PORT} && exit 0; sleep 1; done; exit 1`
+  const probeTimeoutMs = (SERVE_PROBE_SECONDS + 15) * 1000
+
+  const already = await provider.exec(
+    sandboxId,
+    `curl -sf -o /dev/null http://localhost:${APP_PORT}`,
+  )
+  if (already.exitCode === 0) return { ok: true, logs: 'An app was already serving on this port.' }
+
+  // Detached so exec returns immediately; output is kept so a failed start can be reported.
+  await provider.exec(
+    sandboxId,
+    `nohup sh -c 'PORT=${APP_PORT} npm start || PORT=${APP_PORT} npm run dev' ` +
+      `> /tmp/forge-serve.log 2>&1 & echo started`,
+  )
+  const up = await provider.exec(sandboxId, probe, { timeoutMs: probeTimeoutMs })
+  if (up.exitCode === 0) return { ok: true, logs: 'App came up on the expected port.' }
+
+  const tail = await provider.exec(sandboxId, 'tail -n 40 /tmp/forge-serve.log 2>/dev/null || true')
+  return { ok: false, logs: tail.stdout || tail.stderr || 'No output from the start command.' }
+}
+
 export function buildServer(deps?: Partial<ServerDeps>): FastifyInstance {
   const env = parseServerEnv()
   const provider = deps?.provider ?? createSandboxProvider(env)
@@ -395,13 +435,28 @@ function routes(
           logs: buildRes.stderr || buildRes.stdout || `Build failed (exit ${buildRes.exitCode}).`,
         }
       }
+
+      // A green build is not a running app. Start the server and confirm the port answers
+      // before calling anything live, otherwise the "Open app" link hands the user a dead URL.
+      const serving = await serveWorkspace(provider, ws.sandboxId)
+      if (!serving.ok) {
+        return {
+          deployed: false,
+          blocked: false,
+          simulated: false,
+          verdict,
+          logs:
+            `${buildRes.stdout}\nBuild succeeded, but nothing answered on port ${APP_PORT} ` +
+            `within ${SERVE_PROBE_SECONDS}s, so this is not live yet.\n${serving.logs}`,
+        }
+      }
       return {
         deployed: true,
         blocked: false,
         simulated: false,
         verdict,
-        url: `https://3000-${ws.sandboxId}.e2b.dev`,
-        logs: `${buildRes.stdout}\nBuild verified. Deployment is live.`,
+        url: `https://${APP_PORT}-${ws.sandboxId}.e2b.dev`,
+        logs: `${buildRes.stdout}\nBuild verified and the app is answering on port ${APP_PORT}.`,
       }
     })
 
