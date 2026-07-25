@@ -46,7 +46,11 @@ export class OpenRouterLlmClient implements LlmClient {
 
   constructor(private readonly apiKey: string) {}
 
-  async completeSingle(model: string, messages: LlmMessage[], signal?: AbortSignal): Promise<string> {
+  async completeSingle(
+    model: string,
+    messages: LlmMessage[],
+    signal?: AbortSignal,
+  ): Promise<string> {
     const res = await fetch(this.endpoint, {
       method: 'POST',
       headers: {
@@ -59,7 +63,7 @@ export class OpenRouterLlmClient implements LlmClient {
     if (!res.ok) {
       throw new Error(`openrouter single completions: ${res.status} ${res.statusText}`)
     }
-    const json = await res.json() as {
+    const json = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>
     }
     return json.choices?.[0]?.message?.content || ''
@@ -67,40 +71,47 @@ export class OpenRouterLlmClient implements LlmClient {
 
   async complete(opts: CompleteOptions): Promise<string> {
     if (opts.model === 'openrouter/fusion') {
-      opts.onChunk?.('Fusing models: calling Llama-3-8B, Gemini-2.5-Flash, and Mistral-7B in parallel...\n')
+      opts.onChunk?.(
+        'Fusing models: calling Llama-3-8B, Gemini-2.5-Flash, and Mistral-7B in parallel...\n',
+      )
 
       const freeModels = [
         'meta-llama/llama-3-8b-instruct:free',
         'google/gemini-2.5-flash:free',
-        'mistralai/mistral-7b-instruct:free'
+        'mistralai/mistral-7b-instruct:free',
       ]
-      
+
       const responses = await Promise.all(
-        freeModels.map(m => 
-          this.completeSingle(m, opts.messages, opts.signal)
-            .catch(err => `[Model ${m} call failed: ${err instanceof Error ? err.message : String(err)}]`)
-        )
+        freeModels.map((m) =>
+          this.completeSingle(m, opts.messages, opts.signal).catch(
+            (err) =>
+              `[Model ${m} call failed: ${err instanceof Error ? err.message : String(err)}]`,
+          ),
+        ),
       )
-      
-      opts.onChunk?.('\nPanel responses gathered. Invoking the judge model for final synthesis...\n\n')
-      
+
+      opts.onChunk?.(
+        '\nPanel responses gathered. Invoking the judge model for final synthesis...\n\n',
+      )
+
       const userPrompt = opts.messages[opts.messages.length - 1]?.content || ''
       const judgeMessages: LlmMessage[] = [
         {
           role: 'system',
-          content: 'You are an expert developer judge. You have been given a prompt and three proposed answers from different developer assistant models. Synthesize their answers, reconcile contradictions, extract the best coding logic, and output a single refined developer instruction. Do not include raw conversational filler; yield clean instructions.'
+          content:
+            'You are an expert developer judge. You have been given a prompt and three proposed answers from different developer assistant models. Synthesize their answers, reconcile contradictions, extract the best coding logic, and output a single refined developer instruction. Do not include raw conversational filler; yield clean instructions.',
         },
         {
           role: 'user',
-          content: `Original User Prompt:\n${userPrompt}\n\nCandidate Answer 1 (Llama-3):\n${responses[0]}\n\nCandidate Answer 2 (Gemini-Flash):\n${responses[1]}\n\nCandidate Answer 3 (Mistral-7B):\n${responses[2]}\n\nFinal Synthesized Solution:`
-        }
+          content: `Original User Prompt:\n${userPrompt}\n\nCandidate Answer 1 (Llama-3):\n${responses[0]}\n\nCandidate Answer 2 (Gemini-Flash):\n${responses[1]}\n\nCandidate Answer 3 (Mistral-7B):\n${responses[2]}\n\nFinal Synthesized Solution:`,
+        },
       ]
-      
+
       // Delegate to standard streaming path with the frontier/judge model
       return this.complete({
         ...opts,
         model: 'google/gemini-2.5-pro', // Gemini 2.5 Pro as Judge
-        messages: judgeMessages
+        messages: judgeMessages,
       })
     }
 
@@ -309,12 +320,12 @@ export class GeminiLlmClient implements LlmClient {
       const { value, done } = await reader.read()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
-      
+
       let cleaned = buffer.trim()
       if (cleaned.startsWith('[')) cleaned = cleaned.slice(1)
       if (cleaned.endsWith(']')) cleaned = cleaned.slice(0, -1)
       if (cleaned.startsWith(',')) cleaned = cleaned.slice(1)
-      
+
       const parts = cleaned.split(/},\s*\{/)
       if (parts.length > 1) {
         for (let i = 0; i < parts.length - 1; i++) {
@@ -363,10 +374,12 @@ export function createLlmClient(
   customKeys?: { anthropic?: string; google?: string },
 ): LlmClient {
   // A user-supplied key takes precedence so "bring your own Claude" works end to end.
-  if (customKeys?.anthropic) return new AnthropicLlmClient(customKeys.anthropic, env.ANTHROPIC_MODEL)
+  if (customKeys?.anthropic)
+    return new AnthropicLlmClient(customKeys.anthropic, env.ANTHROPIC_MODEL)
   if (customKeys?.google) return new GeminiLlmClient(customKeys.google, env.GOOGLE_MODEL)
   // A server-side Anthropic key drives Claude directly (no OpenRouter needed).
-  if (env.ANTHROPIC_API_KEY) return new AnthropicLlmClient(env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL)
+  if (env.ANTHROPIC_API_KEY)
+    return new AnthropicLlmClient(env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL)
   if (env.OPENROUTER_API_KEY) return new OpenRouterLlmClient(env.OPENROUTER_API_KEY)
   // Server-side Gemini fallback when no OpenRouter/Anthropic key is configured.
   if (env.GEMINI_API_KEY) return new GeminiLlmClient(env.GEMINI_API_KEY, env.GOOGLE_MODEL)

@@ -18,9 +18,9 @@ export class SupabaseSessionStore implements SessionStore {
       .insert({ workspace_id: workspaceId, task })
       .select()
       .single()
-      
+
     if (error || !data) throw new Error(`Failed to create session: ${error?.message}`)
-    
+
     return {
       id: data.id,
       workspaceId: data.workspace_id,
@@ -32,11 +32,11 @@ export class SupabaseSessionStore implements SessionStore {
 
   async appendArtifact(sessionId: string, event: AgentEvent): Promise<void> {
     if (!PERSISTED.has(event.type)) return
-    
+
     const { error } = await this.supabase
       .from('artifacts')
       .insert({ session_id: sessionId, kind: event.type, payload: event })
-      
+
     if (error) console.error('Failed to append artifact:', error.message)
   }
 
@@ -46,7 +46,7 @@ export class SupabaseSessionStore implements SessionStore {
       .select('*, artifacts(kind, payload, created_at)')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
-      
+
     if (error) throw new Error(`Failed to list sessions: ${error.message}`)
 
     interface ArtifactRow {
